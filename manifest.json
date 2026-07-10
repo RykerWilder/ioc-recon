@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "IP recon",
+  "version": "1.0.0",
+  "description": "Fast IP recon",
+  "permissions": [
+    "contextMenus",
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://rdap.org/*",
+    "https://api.blocklist.de/*",
+    "https://check.torproject.org/*",
+    "https://get.geojs.io/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
