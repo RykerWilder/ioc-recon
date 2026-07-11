@@ -572,7 +572,7 @@ function renderPopup(data) {
 
 
       ${sectionTitle("Infrastructure")}
-      ${row("IP risolto", data.ips && data.ips.length ? data.ips.join(", ") : null)}
+      ${row("Resolved IP", data.ips && data.ips.length ? data.ips.join(", ") : null)}
       ${row("Location", data.geo?.label)}
       ${data.geo?.org ? row("Organization", data.geo.org) : ""}
       <div class="ioc-row"><span class="ioc-label">Tor Exit Node</span>${torBadge}</div>
