@@ -1,5 +1,7 @@
 # IOC Recon — Chrome Extension
 
+![IOC Recon](https://github.com/RykerWilder/static_files/blob/main/ioc-recon.gif)
+
 A lightweight Chrome extension (Manifest V3) that lets you select any
 IP address, URL, or domain on a web page, right-click it, and instantly
 get a recon card injected right into the page — no external site, no
