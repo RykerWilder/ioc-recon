@@ -134,7 +134,10 @@ async function lookupGeo(ip) {
 function renderPopup({ ip, cidr, range, name, org, blocklist, isTor, geo, error, cached }) {
   const EXISTING_ID = "__ip_subnet_lookup_popup__";
   const old = document.getElementById(EXISTING_ID);
-  if (old) old.remove();
+  if (old) {
+    if (old.__escHandler) document.removeEventListener("keydown", old.__escHandler);
+    old.remove();
+  }
 
   // Defanging locale dell'IP per uso sicuro nei report (es. 1.2.3.4 -> 1[.]2[.]3[.]4)
   const defangIp = (value) => (value ? value.replace(/\./g, "[.]") : value);
@@ -187,15 +190,23 @@ function renderPopup({ ip, cidr, range, name, org, blocklist, isTor, geo, error,
     fontSize: "14px"
   });
   closeBtn.onclick = () => {
-    clearTimeout(box.__autoCloseTimer);
+    document.removeEventListener("keydown", escHandler);
     box.remove();
   };
+
+  const escHandler = (e) => {
+    if (e.key === "Escape") {
+      document.removeEventListener("keydown", escHandler);
+      box.remove();
+    }
+  };
+  document.addEventListener("keydown", escHandler);
+  box.__escHandler = escHandler;
 
   if (error) {
     box.innerHTML = `<b>Lookup error${ip}</b><br>${error}`;
     box.appendChild(closeBtn);
     document.body.appendChild(box);
-    box.__autoCloseTimer = setTimeout(() => box.remove(), 10000);
     return;
   }
 
@@ -265,7 +276,6 @@ function renderPopup({ ip, cidr, range, name, org, blocklist, isTor, geo, error,
 
   box.appendChild(closeBtn);
   document.body.appendChild(box);
-  box.__autoCloseTimer = setTimeout(() => box.remove(), 20000);
 }
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
