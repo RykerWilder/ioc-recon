@@ -291,7 +291,6 @@ function renderPopup(data) {
     old.remove();
   }
 
-  // --- Helper di defanging locali (niente dipendenze esterne nel contesto pagina) ---
   const defangIp = (value) => (value ? value.replace(/\./g, "[.]") : value);
   const defangUrl = (value) =>
     value
@@ -319,7 +318,53 @@ function renderPopup(data) {
     document.body.removeChild(ta);
   };
 
-  // --- Box base ---
+  const STYLE_ID = "__ioc_recon_style__";
+  if (!document.getElementById(STYLE_ID)) {
+    const style = document.createElement("style");
+    style.id = STYLE_ID;
+    style.textContent = `
+      @keyframes iocFadeIn { from { opacity:0; transform: translateY(-6px); } to { opacity:1; transform: translateY(0); } }
+      #__ioc_recon_popup__ * { box-sizing: border-box; }
+      #__ioc_recon_popup__ .ioc-row {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 6px 0; font-size: 12.5px;
+      }
+      #__ioc_recon_popup__ .ioc-row + .ioc-row { border-top: 1px solid rgba(148,163,184,0.12); }
+      #__ioc_recon_popup__ .ioc-label { color: #94a3b8; font-weight: 500; }
+      #__ioc_recon_popup__ .ioc-value { color: #f1f5f9; font-weight: 600; text-align: right; max-width: 60%; word-break: break-word; }
+      #__ioc_recon_popup__ .ioc-section-title {
+        font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em;
+        color: #64748b; font-weight: 700; margin: 14px 0 4px 0;
+      }
+      #__ioc_recon_popup__ .ioc-section-title:first-of-type { margin-top: 2px; }
+      #__ioc_recon_popup__ .ioc-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
+      }
+      #__ioc_recon_popup__ .ioc-badge.ok { background: rgba(34,197,94,0.15); color: #4ade80; }
+      #__ioc_recon_popup__ .ioc-badge.bad { background: rgba(239,68,68,0.15); color: #f87171; }
+      #__ioc_recon_popup__ .ioc-badge.na { background: rgba(148,163,184,0.15); color: #94a3b8; }
+      #__ioc_recon_popup__ .ioc-copy-btn {
+        all: unset; cursor: pointer; background: #334155; color: #e2e8f0;
+        padding: 7px 12px; border-radius: 8px; font-size: 11.5px; font-weight: 600;
+        transition: background 0.15s ease, transform 0.1s ease;
+      }
+      #__ioc_recon_popup__ .ioc-copy-btn:hover { background: #475569; }
+      #__ioc_recon_popup__ .ioc-copy-btn:active { transform: scale(0.96); }
+      #__ioc_recon_popup__ .ioc-close-btn {
+        position: absolute; top: 10px; right: 12px; cursor: pointer;
+        width: 22px; height: 22px; border-radius: 6px; display: flex;
+        align-items: center; justify-content: center; color: #94a3b8; font-size: 13px;
+        transition: background 0.15s ease, color 0.15s ease;
+      }
+      #__ioc_recon_popup__ .ioc-close-btn:hover { background: rgba(148,163,184,0.15); color: #f1f5f9; }
+      #__ioc_recon_popup__ ::-webkit-scrollbar { width: 6px; }
+      #__ioc_recon_popup__ ::-webkit-scrollbar-thumb { background: #334155; border-radius: 999px; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // --- base box ---
   const box = document.createElement("div");
   box.id = EXISTING_ID;
   Object.assign(box.style, {
@@ -327,35 +372,29 @@ function renderPopup(data) {
     top: "20px",
     right: "20px",
     zIndex: 2147483647,
-    width: "340px",
-    background: "#1e293b",
+    width: "360px",
+    background: "linear-gradient(180deg, #1e293b 0%, #172033 100%)",
     color: "#f1f5f9",
-    fontFamily: "system-ui, -apple-system, Segoe UI, sans-serif",
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif",
     fontSize: "13px",
-    borderRadius: "10px",
-    boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
-    padding: "14px 16px",
-    lineHeight: "1.5",
+    borderRadius: "14px",
+    boxShadow: "0 20px 40px -8px rgba(0,0,0,0.5), 0 0 0 1px rgba(148,163,184,0.08)",
+    padding: "18px 18px 16px 18px",
+    lineHeight: "1.4",
     maxHeight: "80vh",
-    overflowY: "auto"
+    overflowY: "auto",
+    animation: "iocFadeIn 0.18s ease-out"
   });
 
   const closeBtn = document.createElement("div");
   closeBtn.textContent = "✕";
-  Object.assign(closeBtn.style, {
-    position: "absolute",
-    top: "8px",
-    right: "10px",
-    cursor: "pointer",
-    opacity: "0.7",
-    fontSize: "14px"
-  });
+  closeBtn.className = "ioc-close-btn";
   closeBtn.onclick = () => {
     document.removeEventListener("keydown", escHandler);
     box.remove();
   };
 
-  // Chiusura solo con X o ESC: nessuna chiusura automatica a tempo
+  // X or ESC quit
   const escHandler = (e) => {
     if (e.key === "Escape") {
       document.removeEventListener("keydown", escHandler);
@@ -367,19 +406,29 @@ function renderPopup(data) {
 
   // --- Error case ---
   if (data.error) {
-    box.innerHTML = `<b>Error</b><br>${data.error}`;
+    box.innerHTML = `<div style="font-weight:700; margin-bottom:4px;">⚠️ Error</div><div style="color:#94a3b8;">${data.error}</div>`;
     box.appendChild(closeBtn);
     document.body.appendChild(box);
     return;
   }
 
-  const torIcon = data.isTor === null ? "N/D" : data.isTor ? "🔴 True" : "🟢 False";
+  const badge = (state, okLabel, badLabel, naLabel = "N/D") => {
+    if (state === null || state === undefined) return `<span class="ioc-badge na">${naLabel}</span>`;
+    return state
+      ? `<span class="ioc-badge bad">🔴 ${badLabel}</span>`
+      : `<span class="ioc-badge ok">🟢 ${okLabel}</span>`;
+  };
+
+  const row = (label, value) =>
+    `<div class="ioc-row"><span class="ioc-label">${label}</span><span class="ioc-value">${value ?? "N/D"}</span></div>`;
+
+  const sectionTitle = (label) => `<div class="ioc-section-title">${label}</div>`;
 
   const copyRow = document.createElement("div");
   Object.assign(copyRow.style, {
-    marginTop: "10px",
-    paddingTop: "8px",
-    borderTop: "1px solid #334155",
+    marginTop: "14px",
+    paddingTop: "12px",
+    borderTop: "1px solid rgba(148,163,184,0.15)",
     display: "flex",
     alignItems: "center",
     gap: "8px",
@@ -389,82 +438,100 @@ function renderPopup(data) {
   const makeCopyButton = (label, textToCopy) => {
     const btn = document.createElement("button");
     btn.textContent = label;
-    Object.assign(btn.style, {
-      all: "unset",
-      cursor: "pointer",
-      background: "#334155",
-      color: "#f1f5f9",
-      padding: "6px 10px",
-      borderRadius: "6px",
-      fontSize: "12px",
-      fontWeight: "600"
-    });
+    btn.className = "ioc-copy-btn";
     btn.onclick = () => {
       copyText(textToCopy);
       const original = btn.textContent;
-      btn.textContent = "Copied";
+      btn.textContent = "✓ Copied";
       setTimeout(() => (btn.textContent = original), 1200);
     };
     return btn;
   };
 
+  const cachedTag = data.cached
+    ? '<span style="font-weight:500; font-size:10.5px; color:#64748b; background:rgba(148,163,184,0.12); padding:2px 7px; border-radius:999px; margin-left:6px;">cache</span>'
+    : "";
+
   // ---------------------------------------------------------------------
   // IP
   // ---------------------------------------------------------------------
   if (data.kind === "ip") {
+    const torBadge = badge(data.isTor, "False", "True");
+    const repText = data.blocklist
+      ? `${data.blocklist.attacks ?? 0} attacks · ${data.blocklist.reports ?? 0} reports`
+      : "N/D";
+    const repBadge =
+      data.blocklist == null
+        ? `<span class="ioc-badge na">N/D</span>`
+        : data.blocklist.malicious
+        ? `<span class="ioc-badge bad">🔴 ${repText}</span>`
+        : `<span class="ioc-badge ok">🟢 ${repText}</span>`;
+
     box.innerHTML = `
-      <div style="font-weight:600; font-size:14px; margin-bottom:6px;">🔎 ${data.ip} ${
-        data.cached ? '<span style="font-weight:400; font-size:11px; opacity:0.7;">(cache)</span>' : ""
-      }</div>
-      <div><b>CIDR:</b> ${data.cidr || "N/D"}</div>
-      ${data.range && !data.cidr ? `<div><b>Range:</b> ${data.range}</div>` : ""}
-      <div><b>Network:</b> ${data.name || "N/D"}</div>
-      ${data.org ? `<div><b>Organization:</b> ${data.org}</div>` : ""}
-      <div><b>Location:</b> ${data.geo?.label || "N/D"}</div>
-      <hr style="border-color:#334155; margin:8px 0;">
-      <div><b>Reputation:</b> ${
-        data.blocklist
-          ? `attacks=${data.blocklist.attacks ?? 0}, reports=${data.blocklist.reports ?? 0}`
-          : "N/D"
-      }</div>
-      <div><b>Tor Exit Node:</b> ${torIcon}</div>
+      <div style="font-weight:700; font-size:15px; margin-bottom:2px; display:flex; align-items:center;">
+        🔎&nbsp;${data.ip}${cachedTag}
+      </div>
+
+      ${sectionTitle("Network")}
+      ${row("CIDR", data.cidr || (data.range ? null : "N/D"))}
+      ${data.range && !data.cidr ? row("Range", data.range) : ""}
+      ${row("Network name", data.name)}
+      ${data.org ? row("Organization", data.org) : ""}
+      ${row("Location", data.geo?.label)}
+
+      ${sectionTitle("Reputation & Risk")}
+      <div class="ioc-row"><span class="ioc-label">Blocklist.de</span>${repBadge}</div>
+      <div class="ioc-row"><span class="ioc-label">Tor Exit Node</span>${torBadge}</div>
     `;
 
     copyRow.appendChild(makeCopyButton("Copy defanged IP", defangIp(data.ip)));
   }
 
+  // ---------------------------------------------------------------------
+  // URL / DOMAIN
+  // ---------------------------------------------------------------------
   if (data.kind === "url") {
-    const urlscanVerdict =
+    const urlscanBadge =
       data.urlscan === null
-        ? "No previous scans found"
+        ? `<span class="ioc-badge na">No previous scans</span>`
         : data.urlscan.malicious === true
-        ? `🔴 Malicious (score ${data.urlscan.score ?? "N/D"})`
+        ? `<span class="ioc-badge bad">🔴 Malicious (score ${data.urlscan.score ?? "N/D"})</span>`
         : data.urlscan.malicious === false
-        ? `🟢 Clean (score ${data.urlscan.score ?? "N/D"})`
-        : "N/D";
+        ? `<span class="ioc-badge ok">🟢 Clean (score ${data.urlscan.score ?? "N/D"})</span>`
+        : `<span class="ioc-badge na">N/D</span>`;
+
+    const torBadge = badge(data.isTor, "False", "True");
+    const repText = data.blocklist
+      ? `${data.blocklist.attacks ?? 0} attacks · ${data.blocklist.reports ?? 0} reports`
+      : "N/D";
+    const repBadge =
+      data.blocklist == null
+        ? `<span class="ioc-badge na">N/D</span>`
+        : data.blocklist.malicious
+        ? `<span class="ioc-badge bad">🔴 ${repText}</span>`
+        : `<span class="ioc-badge ok">🟢 ${repText}</span>`;
 
     box.innerHTML = `
-      <div style="font-weight:600; font-size:14px; margin-bottom:6px; word-break:break-all;">
-        🔎 ${data.domain} ${data.cached ? '<span style="font-weight:400; font-size:11px; opacity:0.7;">(cache)</span>' : ""}
+      <div style="font-weight:700; font-size:15px; margin-bottom:2px; word-break:break-all; display:flex; align-items:center; flex-wrap:wrap;">
+        🔎&nbsp;${data.domain}${cachedTag}
       </div>
-      <div style="font-size:11px; opacity:0.75; word-break:break-all; margin-bottom:8px;">${data.url}</div>
+      <div style="font-size:11px; color:#64748b; word-break:break-all; margin-bottom:6px;">${data.url}</div>
 
-      <div><b>Registrar:</b> ${data.rdap?.registrar || "N/D"}</div>
-      <div><b>Registration:</b> ${data.rdap?.registration ? new Date(data.rdap.registration).toLocaleDateString() : "N/D"}</div>
-      <div><b>Expiration:</b> ${data.rdap?.expiration ? new Date(data.rdap.expiration).toLocaleDateString() : "N/D"}</div>
-      ${data.rdap?.status ? `<div><b>Status:</b> ${data.rdap.status}</div>` : ""}
+      ${sectionTitle("WHOIS")}
+      ${row("Registrar", data.rdap?.registrar)}
+      ${row("Registered", data.rdap?.registration ? new Date(data.rdap.registration).toLocaleDateString() : null)}
+      ${row("Expires", data.rdap?.expiration ? new Date(data.rdap.expiration).toLocaleDateString() : null)}
+      ${data.rdap?.status ? row("Status", data.rdap.status) : ""}
 
-      <hr style="border-color:#334155; margin:8px 0;">
+      ${sectionTitle("Infrastructure")}
+      ${row("IP risolto", data.ips && data.ips.length ? data.ips.join(", ") : null)}
+      ${row("Location", data.geo?.label)}
+      ${data.geo?.org ? row("Organization", data.geo.org) : ""}
 
-      <div><b>Resolved IP:</b> ${data.ips && data.ips.length ? data.ips.join(", ") : "N/D"}</div>
-      <div><b>Location:</b> ${data.geo?.label || "N/D"}</div>
-      ${data.geo?.org ? `<div><b>Organization:</b> ${data.geo.org}</div>` : ""}
-      <div><b>Tor Exit Node:</b> ${torIcon}</div>
-      <div><b>IP reputation:</b> ${
-        data.blocklist ? `attacks=${data.blocklist.attacks ?? 0}, reports=${data.blocklist.reports ?? 0}` : "N/D"
-      }</div>
-
-      <hr style="border-color:#334155; margin:8px 0;">
+      ${sectionTitle("Reputation & Risk")}
+      <div class="ioc-row"><span class="ioc-label">urlscan.io</span>${urlscanBadge}</div>
+      <div class="ioc-row"><span class="ioc-label">Blocklist.de</span>${repBadge}</div>
+      <div class="ioc-row"><span class="ioc-label">Tor Exit Node</span>${torBadge}</div>
     `;
 
     copyRow.appendChild(makeCopyButton("Copy defanged URL", defangUrl(data.url)));
