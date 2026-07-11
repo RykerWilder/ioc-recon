@@ -128,10 +128,35 @@ async function lookupGeo(ip) {
 }
 
 // --- Inject popup into the page (executed in the tab's context) ---
+// NOTA: questa funzione viene eseguita nel contesto della pagina tramite
+// chrome.scripting.executeScript, quindi deve essere completamente
+// autosufficiente (niente riferimenti a funzioni esterne come defang()).
 function renderPopup({ ip, cidr, range, name, org, blocklist, isTor, geo, error, cached }) {
   const EXISTING_ID = "__ip_subnet_lookup_popup__";
   const old = document.getElementById(EXISTING_ID);
   if (old) old.remove();
+
+  // Defanging locale dell'IP per uso sicuro nei report (es. 1.2.3.4 -> 1[.]2[.]3[.]4)
+  const defangIp = (value) => (value ? value.replace(/\./g, "[.]") : value);
+
+  const copyText = (text) => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+    } else {
+      fallbackCopy(text);
+    }
+  };
+
+  const fallbackCopy = (text) => {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+  };
 
   const box = document.createElement("div");
   box.id = EXISTING_ID;
@@ -178,9 +203,11 @@ function renderPopup({ ip, cidr, range, name, org, blocklist, isTor, geo, error,
   const torIcon = isTor ? "🔴 True" : "🟢 False";
 
   box.innerHTML = `
-    <div style="font-weight:600; font-size:14px; margin-bottom:6px;">🔎 ${ip} ${
-      cached ? '<span style="font-weight:400; font-size:11px; opacity:0.7;">(cache)</span>' : ""
-    }</div>
+    <div style="font-weight:600; font-size:14px; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+      <span>🔎 ${ip} ${
+        cached ? '<span style="font-weight:400; font-size:11px; opacity:0.7;">(cache)</span>' : ""
+      }</span>
+    </div>
     <div><b>CIDR:</b> ${cidr || "N/D"}</div>
     ${range && !cidr ? `<div><b>Range:</b> ${range}</div>` : ""}
     <div><b>Network:</b> ${name}</div>
@@ -194,6 +221,48 @@ function renderPopup({ ip, cidr, range, name, org, blocklist, isTor, geo, error,
     }</div>
     <div><b>Tor Exit Node:</b> ${isTor === null ? "N/D" : torIcon}</div>
   `;
+
+  const copyRow = document.createElement("div");
+  Object.assign(copyRow.style, {
+    marginTop: "10px",
+    paddingTop: "8px",
+    borderTop: "1px solid #334155",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px"
+  });
+
+  const copyBtn = document.createElement("button");
+  copyBtn.textContent = "Copy defanged IP";
+  Object.assign(copyBtn.style, {
+    all: "unset",
+    cursor: "pointer",
+    background: "#334155",
+    color: "#f1f5f9",
+    padding: "6px 10px",
+    borderRadius: "6px",
+    fontSize: "12px",
+    fontWeight: "600"
+  });
+
+  const feedback = document.createElement("span");
+  feedback.style.fontSize = "11px";
+  feedback.style.opacity = "0.8";
+
+  copyBtn.onclick = () => {
+    copyText(defangIp(ip));
+    const original = copyBtn.textContent;
+    copyBtn.textContent = "Copied";
+    feedback.textContent = defangIp(ip);
+    setTimeout(() => {
+      copyBtn.textContent = original;
+    }, 1200);
+  };
+
+  copyRow.appendChild(copyBtn);
+  copyRow.appendChild(feedback);
+  box.appendChild(copyRow);
+
   box.appendChild(closeBtn);
   document.body.appendChild(box);
   box.__autoCloseTimer = setTimeout(() => box.remove(), 20000);
