@@ -134,6 +134,11 @@ function virusTotalUrlLink(url) {
 }
 
 
+function shodanHostUrl(ip) {
+  return `https://www.shodan.io/host/${encodeURIComponent(ip)}`;
+}
+
+
 // --- Tor Exit List ---
 async function isTorExitNode(ip) {
   let list = await cacheGet("tor:list");
@@ -169,6 +174,26 @@ async function lookupGeo(ip) {
     lat: data.latitude || null,
     lon: data.longitude || null,
     org: data.organization_name || data.organization || null
+  };
+}
+
+
+// --- ASN / AS name ---
+async function lookupAsn(ip) {
+  const url = `https://ipinfo.io/${encodeURIComponent(ip)}/json`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`ipinfo HTTP ${res.status}`);
+  const data = await res.json();
+
+
+  // data.org is typically in the form "AS15169 Google LLC"
+  const org = data.org || "";
+  const match = org.match(/^(AS\d+)\s*(.*)$/i);
+
+
+  return {
+    asn: match ? match[1].toUpperCase() : null,
+    asName: match ? match[2] || null : org || null
   };
 }
 
@@ -233,8 +258,7 @@ async function lookupRdapDomain(domain) {
     registrar,
     registration,
     expiration,
-    nameservers,
-    status: (data.status || []).join(", ") || null
+    nameservers
   };
 }
 
@@ -251,18 +275,21 @@ async function resolveDns(domain) {
 async function gatherIpIntel(ip) {
   const result = { kind: "ip", ip };
   result.abuseipdbUrl = abuseIpDbUrl(ip);
+  result.shodanUrl = shodanHostUrl(ip);
 
 
-  const [rdap, tor, geo] = await Promise.allSettled([
+  const [rdap, tor, geo, asn] = await Promise.allSettled([
     lookupRdapIp(ip),
     isTorExitNode(ip),
-    lookupGeo(ip)
+    lookupGeo(ip),
+    lookupAsn(ip)
   ]);
 
 
   if (rdap.status === "fulfilled") Object.assign(result, rdap.value);
   result.isTor = tor.status === "fulfilled" ? tor.value : null;
   if (geo.status === "fulfilled") result.geo = geo.value;
+  if (asn.status === "fulfilled") Object.assign(result, asn.value);
 
 
   return result;
@@ -384,6 +411,8 @@ function renderPopup(data) {
     #__ioc_recon_popup__ .ioc-link-btn.abuseipdb:hover { background: #e07a24; }
     #__ioc_recon_popup__ .ioc-link-btn.virustotal { background: #394eff; color: #ffffff; }
     #__ioc_recon_popup__ .ioc-link-btn.virustotal:hover { background: #2d3ecc; }
+    #__ioc_recon_popup__ .ioc-link-btn.shodan { background: #cc0000; color: #ffffff; }
+    #__ioc_recon_popup__ .ioc-link-btn.shodan:hover { background: #a30000; }
     #__ioc_recon_popup__ .ioc-close-btn {
       position: absolute; top: 10px; right: 12px; cursor: pointer;
       width: 22px; height: 22px; border-radius: 6px; display: flex;
@@ -507,6 +536,10 @@ function renderPopup(data) {
     data.kind === "ip"
       ? data.abuseipdbUrl || `https://www.abuseipdb.com/check/${encodeURIComponent(data.ip)}`
       : null;
+  const shodanUrl =
+    data.kind === "ip"
+      ? data.shodanUrl || `https://www.shodan.io/host/${encodeURIComponent(data.ip)}`
+      : null;
   const toBase64UrlLocal = (str) => {
     const b64 = btoa(unescape(encodeURIComponent(str)));
     return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -540,12 +573,15 @@ function renderPopup(data) {
       ${data.range && !data.cidr ? row("Range", data.range) : ""}
       ${row("Network name", data.name)}
       ${data.org ? row("Organization", data.org) : ""}
+      ${row("ASN", data.asn)}
+      ${data.asName ? row("AS Name", data.asName) : ""}
       ${row("Location", data.geo?.label)}
       <div class="ioc-row"><span class="ioc-label">Tor Exit Node</span>${torBadge}</div>
     `;
 
 
     actionRow.appendChild(makeLinkButton("Open on AbuseIPDB ↗", abuseipdbUrl, "abuseipdb"));
+    actionRow.appendChild(makeLinkButton("Open on Shodan ↗", shodanUrl, "shodan"));
     actionRow.appendChild(makeCopyButton("Copy defanged IP", defangIp(data.ip)));
   }
 
@@ -568,7 +604,6 @@ function renderPopup(data) {
       ${row("Registrar", data.rdap?.registrar)}
       ${row("Registered", data.rdap?.registration ? new Date(data.rdap.registration).toLocaleDateString() : null)}
       ${row("Expires", data.rdap?.expiration ? new Date(data.rdap.expiration).toLocaleDateString() : null)}
-      ${data.rdap?.status ? row("Status", data.rdap.status) : ""}
 
 
       ${sectionTitle("Infrastructure")}

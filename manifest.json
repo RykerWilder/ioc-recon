@@ -10,7 +10,8 @@
     "https://api.blocklist.de/*",
     "https://get.geojs.io/*",
     "https://urlscan.io/*",
-    "https://check.torproject.org/*"
+    "https://check.torproject.org/*",
+    "https://ipinfo.io/*"
   ],
   "background": {
     "service_worker": "background.js"
