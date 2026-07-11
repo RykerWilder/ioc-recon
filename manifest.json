@@ -1,19 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "IP recon",
+  "name": "IOC Recon",
   "version": "1.0.0",
-  "description": "Fast IP recon",
-  "permissions": [
-    "contextMenus",
-    "activeTab",
-    "scripting",
-    "storage"
-  ],
+  "description": "Quick analysis of a selected IOC (IP or URL/domain)",
+  "permissions": ["contextMenus", "scripting", "storage", "activeTab"],
   "host_permissions": [
     "https://rdap.org/*",
+    "https://dns.google/*",
     "https://api.blocklist.de/*",
-    "https://check.torproject.org/*",
-    "https://get.geojs.io/*"
+    "https://get.geojs.io/*",
+    "https://urlscan.io/*",
+    "https://check.torproject.org/*"
   ],
   "background": {
     "service_worker": "background.js"
