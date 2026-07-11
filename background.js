@@ -39,7 +39,7 @@ function extractUrlOrDomain(rawSelection) {
     }
   }
 
-  // Caso 2: dominio nudo (con eventuale path), senza schema -> assume https
+
   const domainMatch = text.match(
     /^((?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,})(\/\S*)?$/
   );
@@ -80,8 +80,8 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 
-const CACHE_TTL_RESULT_MS = 30 * 60 * 1000; 
-const CACHE_TTL_TORLIST_MS = 60 * 60 * 1000; 
+const CACHE_TTL_RESULT_MS = 30 * 60 * 1000;
+const CACHE_TTL_TORLIST_MS = 60 * 60 * 1000;
 
 async function cacheGet(key) {
   const stored = await chrome.storage.local.get(key);
@@ -100,20 +100,18 @@ async function cacheSet(key, value, ttlMs) {
   });
 }
 
-async function lookupBlocklistDe(ip) {
-  const url = `https://api.blocklist.de/api.php?ip=${encodeURIComponent(ip)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Blocklist.de HTTP ${res.status}`);
-  const text = (await res.text()).trim();
+function abuseIpDbUrl(ip) {
+  return `https://www.abuseipdb.com/check/${encodeURIComponent(ip)}`;
+}
 
-  const attacksMatch = text.match(/attacks:\s*(\d+)/i);
-  const reportsMatch = text.match(/reports?:\s*(\d+)/i);
+function toBase64Url(str) {
+  const b64 = btoa(unescape(encodeURIComponent(str)));
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
 
-  const attacks = attacksMatch ? Number(attacksMatch[1]) : null;
-  const reports = reportsMatch ? Number(reportsMatch[1]) : null;
-  const malicious = (attacks && attacks > 0) || (reports && reports > 0);
-
-  return { attacks, reports, malicious };
+function virusTotalUrlLink(url) {
+  const id = toBase64Url(url);
+  return `https://www.virustotal.com/gui/url/${id}`;
 }
 
 // --- Tor Exit List ---
@@ -216,34 +214,17 @@ async function resolveDns(domain) {
   return (data.Answer || []).filter((a) => a.type === 1).map((a) => a.data);
 }
 
-async function lookupUrlscan(domain) {
-  const url = `https://urlscan.io/api/v1/search/?q=domain:${encodeURIComponent(domain)}&size=1`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`urlscan.io HTTP ${res.status}`);
-  const data = await res.json();
-  const hit = data.results && data.results[0];
-  if (!hit) return null;
-
-  return {
-    scanDate: hit.task?.time || null,
-    reportUrl: hit.result || null,
-    malicious: hit.verdicts?.overall?.malicious ?? null,
-    score: hit.verdicts?.overall?.score ?? null
-  };
-}
-
 async function gatherIpIntel(ip) {
   const result = { kind: "ip", ip };
+  result.abuseipdbUrl = abuseIpDbUrl(ip);
 
-  const [rdap, blocklist, tor, geo] = await Promise.allSettled([
+  const [rdap, tor, geo] = await Promise.allSettled([
     lookupRdapIp(ip),
-    lookupBlocklistDe(ip),
     isTorExitNode(ip),
     lookupGeo(ip)
   ]);
 
   if (rdap.status === "fulfilled") Object.assign(result, rdap.value);
-  if (blocklist.status === "fulfilled") result.blocklist = blocklist.value;
   result.isTor = tor.status === "fulfilled" ? tor.value : null;
   if (geo.status === "fulfilled") result.geo = geo.value;
 
@@ -252,25 +233,22 @@ async function gatherIpIntel(ip) {
 
 async function gatherUrlIntel(url, domain) {
   const result = { kind: "url", url, domain };
+  result.virustotalUrl = virusTotalUrlLink(url);
 
-  const [rdap, ipsResult, urlscan] = await Promise.allSettled([
+  const [rdap, ipsResult] = await Promise.allSettled([
     lookupRdapDomain(domain),
-    resolveDns(domain),
-    lookupUrlscan(domain)
+    resolveDns(domain)
   ]);
 
   if (rdap.status === "fulfilled") result.rdap = rdap.value;
   result.ips = ipsResult.status === "fulfilled" ? ipsResult.value : [];
-  result.urlscan = urlscan.status === "fulfilled" ? urlscan.value : null;
 
   if (result.ips.length > 0) {
     const firstIp = result.ips[0];
-    const [blocklist, geo, tor] = await Promise.allSettled([
-      lookupBlocklistDe(firstIp),
+    const [geo, tor] = await Promise.allSettled([
       lookupGeo(firstIp),
       isTorExitNode(firstIp)
     ]);
-    if (blocklist.status === "fulfilled") result.blocklist = blocklist.value;
     if (geo.status === "fulfilled") result.geo = geo.value;
     result.isTor = tor.status === "fulfilled" ? tor.value : null;
   } else {
@@ -344,13 +322,17 @@ function renderPopup(data) {
       #__ioc_recon_popup__ .ioc-badge.ok { background: rgba(34,197,94,0.15); color: #4ade80; }
       #__ioc_recon_popup__ .ioc-badge.bad { background: rgba(239,68,68,0.15); color: #f87171; }
       #__ioc_recon_popup__ .ioc-badge.na { background: rgba(148,163,184,0.15); color: #94a3b8; }
-      #__ioc_recon_popup__ .ioc-copy-btn {
+      #__ioc_recon_popup__ .ioc-copy-btn, #__ioc_recon_popup__ .ioc-link-btn {
         all: unset; cursor: pointer; background: #334155; color: #e2e8f0;
         padding: 7px 12px; border-radius: 8px; font-size: 11.5px; font-weight: 600;
         transition: background 0.15s ease, transform 0.1s ease;
       }
-      #__ioc_recon_popup__ .ioc-copy-btn:hover { background: #475569; }
-      #__ioc_recon_popup__ .ioc-copy-btn:active { transform: scale(0.96); }
+      #__ioc_recon_popup__ .ioc-copy-btn:hover, #__ioc_recon_popup__ .ioc-link-btn:hover { background: #475569; }
+      #__ioc_recon_popup__ .ioc-copy-btn:active, #__ioc_recon_popup__ .ioc-link-btn:active { transform: scale(0.96); }
+      #__ioc_recon_popup__ .ioc-link-btn.abuseipdb { background: #7c2d12; color: #fed7aa; }
+      #__ioc_recon_popup__ .ioc-link-btn.abuseipdb:hover { background: #9a3412; }
+      #__ioc_recon_popup__ .ioc-link-btn.virustotal { background: #1e3a5f; color: #bfdbfe; }
+      #__ioc_recon_popup__ .ioc-link-btn.virustotal:hover { background: #1e40af; }
       #__ioc_recon_popup__ .ioc-close-btn {
         position: absolute; top: 10px; right: 12px; cursor: pointer;
         width: 22px; height: 22px; border-radius: 6px; display: flex;
@@ -424,8 +406,8 @@ function renderPopup(data) {
 
   const sectionTitle = (label) => `<div class="ioc-section-title">${label}</div>`;
 
-  const copyRow = document.createElement("div");
-  Object.assign(copyRow.style, {
+  const actionRow = document.createElement("div");
+  Object.assign(actionRow.style, {
     marginTop: "14px",
     paddingTop: "12px",
     borderTop: "1px solid rgba(148,163,184,0.15)",
@@ -448,6 +430,32 @@ function renderPopup(data) {
     return btn;
   };
 
+  const makeLinkButton = (label, targetUrl, extraClass) => {
+    const btn = document.createElement("button");
+    btn.textContent = label;
+    btn.className = `ioc-link-btn ${extraClass}`;
+    btn.type = "button";
+    btn.onclick = (e) => {
+      e.preventDefault();
+      if (!targetUrl) return;
+      window.open(targetUrl, "_blank");
+    };
+    return btn;
+  };
+
+  const abuseipdbUrl =
+    data.kind === "ip"
+      ? data.abuseipdbUrl || `https://www.abuseipdb.com/check/${encodeURIComponent(data.ip)}`
+      : null;
+  const toBase64UrlLocal = (str) => {
+    const b64 = btoa(unescape(encodeURIComponent(str)));
+    return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  };
+  const virustotalUrl =
+    data.kind === "url"
+      ? data.virustotalUrl || `https://www.virustotal.com/gui/url/${toBase64UrlLocal(data.url)}`
+      : null;
+
   const cachedTag = data.cached
     ? '<span style="font-weight:500; font-size:10.5px; color:#64748b; background:rgba(148,163,184,0.12); padding:2px 7px; border-radius:999px; margin-left:6px;">cache</span>'
     : "";
@@ -457,15 +465,6 @@ function renderPopup(data) {
   // ---------------------------------------------------------------------
   if (data.kind === "ip") {
     const torBadge = badge(data.isTor, "False", "True");
-    const repText = data.blocklist
-      ? `${data.blocklist.attacks ?? 0} attacks · ${data.blocklist.reports ?? 0} reports`
-      : "N/D";
-    const repBadge =
-      data.blocklist == null
-        ? `<span class="ioc-badge na">N/D</span>`
-        : data.blocklist.malicious
-        ? `<span class="ioc-badge bad">🔴 ${repText}</span>`
-        : `<span class="ioc-badge ok">🟢 ${repText}</span>`;
 
     box.innerHTML = `
       <div style="font-weight:700; font-size:15px; margin-bottom:2px; display:flex; align-items:center;">
@@ -478,38 +477,18 @@ function renderPopup(data) {
       ${row("Network name", data.name)}
       ${data.org ? row("Organization", data.org) : ""}
       ${row("Location", data.geo?.label)}
-
-      ${sectionTitle("Reputation & Risk")}
-      <div class="ioc-row"><span class="ioc-label">Blocklist.de</span>${repBadge}</div>
       <div class="ioc-row"><span class="ioc-label">Tor Exit Node</span>${torBadge}</div>
     `;
 
-    copyRow.appendChild(makeCopyButton("Copy defanged IP", defangIp(data.ip)));
+    actionRow.appendChild(makeLinkButton("Open on AbuseIPDB ↗", abuseipdbUrl, "abuseipdb"));
+    actionRow.appendChild(makeCopyButton("Copy defanged IP", defangIp(data.ip)));
   }
 
   // ---------------------------------------------------------------------
   // URL / DOMAIN
   // ---------------------------------------------------------------------
   if (data.kind === "url") {
-    const urlscanBadge =
-      data.urlscan === null
-        ? `<span class="ioc-badge na">No previous scans</span>`
-        : data.urlscan.malicious === true
-        ? `<span class="ioc-badge bad">🔴 Malicious (score ${data.urlscan.score ?? "N/D"})</span>`
-        : data.urlscan.malicious === false
-        ? `<span class="ioc-badge ok">🟢 Clean (score ${data.urlscan.score ?? "N/D"})</span>`
-        : `<span class="ioc-badge na">N/D</span>`;
-
     const torBadge = badge(data.isTor, "False", "True");
-    const repText = data.blocklist
-      ? `${data.blocklist.attacks ?? 0} attacks · ${data.blocklist.reports ?? 0} reports`
-      : "N/D";
-    const repBadge =
-      data.blocklist == null
-        ? `<span class="ioc-badge na">N/D</span>`
-        : data.blocklist.malicious
-        ? `<span class="ioc-badge bad">🔴 ${repText}</span>`
-        : `<span class="ioc-badge ok">🟢 ${repText}</span>`;
 
     box.innerHTML = `
       <div style="font-weight:700; font-size:15px; margin-bottom:2px; word-break:break-all; display:flex; align-items:center; flex-wrap:wrap;">
@@ -527,18 +506,15 @@ function renderPopup(data) {
       ${row("IP risolto", data.ips && data.ips.length ? data.ips.join(", ") : null)}
       ${row("Location", data.geo?.label)}
       ${data.geo?.org ? row("Organization", data.geo.org) : ""}
-
-      ${sectionTitle("Reputation & Risk")}
-      <div class="ioc-row"><span class="ioc-label">urlscan.io</span>${urlscanBadge}</div>
-      <div class="ioc-row"><span class="ioc-label">Blocklist.de</span>${repBadge}</div>
       <div class="ioc-row"><span class="ioc-label">Tor Exit Node</span>${torBadge}</div>
     `;
 
-    copyRow.appendChild(makeCopyButton("Copy defanged URL", defangUrl(data.url)));
-    copyRow.appendChild(makeCopyButton("Copy defanged domain", defangUrl(data.domain)));
+    actionRow.appendChild(makeLinkButton("Open on VirusTotal ↗", virustotalUrl, "virustotal"));
+    actionRow.appendChild(makeCopyButton("Copy defanged URL", defangUrl(data.url)));
+    actionRow.appendChild(makeCopyButton("Copy defanged domain", defangUrl(data.domain)));
   }
 
-  box.appendChild(copyRow);
+  box.appendChild(actionRow);
   box.appendChild(closeBtn);
   document.body.appendChild(box);
 }
