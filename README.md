@@ -1,4 +1,11 @@
 # IOC Recon — Chromium Extension
+
+![License](https://img.shields.io/badge/license-MIT-blue)
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?logo=javascript&logoColor=black&labelColor=F7DF1E)
+![VirusTotal](https://img.shields.io/badge/VirusTotal-394EFF?style=flat&logo=virustotal&logoColor=white)
+![Shodan](https://img.shields.io/badge/Shodan-EE1C2E?style=flat&logo=shodan&logoColor=white)
+![AbuseIPDB](https://img.shields.io/badge/AbuseIPDB-1E1E1E?style=flat)
+
 ![IOC Recon](https://github.com/RykerWilder/static_files/blob/main/ioc-recon.gif)
 
 A lightweight Chromium extension (Manifest V3) that lets you select any IP address, URL, or domain on a web page, right-click it, and instantly get a recon card injected right into the page — no external site, no API key.
