@@ -98,6 +98,36 @@ const CACHE_TTL_RESULT_MS = 30 * 60 * 1000;
 const CACHE_TTL_TORLIST_MS = 60 * 60 * 1000;
 
 
+// --- IOC history (used by the toolbar popup) ---
+const HISTORY_KEY = "iocHistory";
+const HISTORY_MAX = 10;
+
+
+function defangIpValue(value) {
+  return value ? value.replace(/\./g, "[.]") : value;
+}
+
+
+function defangUrlValue(value) {
+  return value
+    ? value
+        .replace(/http/gi, (m) => (m === m.toUpperCase() ? "HXXP" : "hxxp"))
+        .replace(/\./g, "[.]")
+    : value;
+}
+
+
+async function saveToHistory(entry) {
+  const stored = await chrome.storage.local.get(HISTORY_KEY);
+  let history = stored[HISTORY_KEY] || [];
+  // remove any previous entry for the same IOC so it moves back to the top
+  history = history.filter((h) => !(h.kind === entry.kind && h.value === entry.value));
+  history.unshift(entry);
+  history = history.slice(0, HISTORY_MAX);
+  await chrome.storage.local.set({ [HISTORY_KEY]: history });
+}
+
+
 async function cacheGet(key) {
   const stored = await chrome.storage.local.get(key);
   const entry = stored[key];
@@ -642,6 +672,24 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     });
     return;
   }
+
+
+  const historyEntry =
+    classified.kind === "ip"
+      ? {
+          kind: "ip",
+          value: classified.ip,
+          defanged: defangIpValue(classified.ip),
+          timestamp: Date.now()
+        }
+      : {
+          kind: "url",
+          value: classified.url,
+          domain: classified.domain,
+          defanged: defangUrlValue(classified.url),
+          timestamp: Date.now()
+        };
+  await saveToHistory(historyEntry);
 
 
   const cacheKey =
