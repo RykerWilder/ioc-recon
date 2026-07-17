@@ -1,5 +1,3 @@
-// Storico IOC (letto anche dal popup della toolbar) + cache generica TTL.
-
 const HISTORY_KEY = "iocHistory";
 const HISTORY_MAX = 10;
 
