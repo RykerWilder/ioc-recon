@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "IOC Recon",
   "version": "1.0.0",
-  "description": "Quick analysis of a selected IOC (IP or URL/domain)",
+  "description": "Quick analysis of a selected IOC (IP or URL/domain), with a toolbar history of your last lookups",
   "permissions": ["contextMenus", "scripting", "storage", "activeTab"],
   "host_permissions": [
     "https://rdap.org/*",
