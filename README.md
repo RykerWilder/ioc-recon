@@ -46,6 +46,10 @@ If the selected text is neither a valid IP nor a valid URL/domain, the card show
 
 Every card includes buttons to copy a **defanged** version of the IOC (e.g. `1[.]2[.]3[.]4` or `hxxps://evil[.]com`), so you can paste it into a report or ticket without it becoming a clickable link or a resolvable address.
 
+## IOC history
+
+Click the extension icon in the toolbar to see the last 10 IOCs you've analyzed, most recent first. Each entry shows the IOC value, how long ago it was checked, and a one-click button to copy its defanged form — handy for quickly re-pasting an IOC into a report without re-running the lookup.
+
 ## Installation (developer mode)
 
 1. Extract the folder to your disk.
