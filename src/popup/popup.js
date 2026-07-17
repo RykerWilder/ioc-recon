@@ -1,3 +1,34 @@
+// Applica il tema condiviso (src/shared/theme.js) come CSS custom
+// properties sul root del documento, cosi popup.css e la card iniettata
+// nella pagina (inject-popup.js) partono sempre dagli stessi identici
+// valori di colore e border-radius.
+(function applyTheme() {
+  if (typeof IOC_THEME === "undefined") return; // fallback ai valori di default nel CSS
+  const root = document.documentElement.style;
+  const { color: c, radius: r, font } = IOC_THEME;
+
+  root.setProperty("--ioc-radius-popup", r.popup);
+  root.setProperty("--ioc-radius-row", r.row);
+  root.setProperty("--ioc-radius-button", r.button);
+  root.setProperty("--ioc-radius-pill", r.pill);
+
+  root.setProperty("--ioc-bg-top", c.bgTop);
+  root.setProperty("--ioc-bg-bottom", c.bgBottom);
+  root.setProperty("--ioc-text", c.text);
+  root.setProperty("--ioc-muted", c.muted);
+  root.setProperty("--ioc-accent", c.accent);
+  root.setProperty("--ioc-accent-hover", c.accentHover);
+  root.setProperty("--ioc-border", c.border);
+  root.setProperty("--ioc-border-soft", c.borderSoft);
+  root.setProperty("--ioc-row-hover", c.rowHover);
+  root.setProperty("--ioc-ip-badge", c.ipBadge);
+  root.setProperty("--ioc-ip-badge-bg", c.ipBadgeBg);
+  root.setProperty("--ioc-url-badge", c.urlBadge);
+  root.setProperty("--ioc-url-badge-bg", c.urlBadgeBg);
+  root.setProperty("--ioc-copied", c.copied);
+  root.setProperty("--ioc-font", font);
+})();
+
 const HISTORY_KEY = "iocHistory";
 
 function timeAgo(ts) {
