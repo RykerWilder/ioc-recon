@@ -1,20 +1,10 @@
-// Unica fonte di verità per lo stile dell'estensione.
-// Caricato in due modi diversi ma dallo stesso identico file:
-//  - nel service worker, via importScripts("../shared/theme.js"), per essere
-//    passato come argomento a renderPopup() quando viene iniettato in pagina
-//  - in popup.html, come <script> classico, per impostare le CSS custom
-//    properties consumate da popup.css
-//
-// Cambiare un colore o un raggio qui si riflette automaticamente ovunque:
-// niente più valori duplicati che possono disallinearsi tra loro.
-
 const IOC_THEME = {
   radius: {
-    popup: "14px",   // contenitore principale (popup toolbar + card iniettata)
-    row: "8px",       // righe hover nella lista storico
-    button: "8px",    // pulsanti azione (copia, link esterni)
-    pill: "999px",    // badge tondeggianti (kind-badge, ioc-badge)
-    close: "6px"      // pulsante di chiusura della card iniettata
+    popup: "14px",
+    row: "8px",
+    button: "8px",
+    pill: "999px",
+    close: "6px"
   },
   color: {
     bgTop: "#16233d",
@@ -46,8 +36,6 @@ const IOC_THEME = {
   shadow: "0 20px 40px -8px rgba(0,0,0,0.5), 0 0 0 1px rgba(201,154,91,0.08)"
 };
 
-// Espone IOC_THEME sia in contesto service worker (self) sia in contesto
-// finestra (self === window nel popup), senza bisogno di export/import ESM.
 if (typeof self !== "undefined") {
   self.IOC_THEME = IOC_THEME;
 }

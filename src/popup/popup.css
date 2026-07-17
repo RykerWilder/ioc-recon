@@ -2,12 +2,6 @@
   box-sizing: border-box;
 }
 
-/* Fix: Chrome disegna la finestra del popup in base alle dimensioni di
-   <html>, non solo di <body>. Se <html> resta col background bianco di
-   default e senza lo stesso border-radius/overflow, negli angoli si vede
-   uno spigolo/sfondo che rompe l'arrotondamento del contenitore sottostante.
-   Applicando radius + overflow anche qui, il popup risulta arrotondato
-   esattamente come la card iniettata nella pagina (stesso --ioc-radius-popup). */
 html {
   background: transparent;
   border-radius: var(--ioc-radius-popup, 14px);

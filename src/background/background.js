@@ -1,5 +1,3 @@
-// Entry point del service worker. Nessuna logica di business qui dentro:
-// solo il collegamento tra gli eventi Chrome e i moduli importati.
 importScripts(
   "../shared/theme.js",
   "./ioc-classifier.js",

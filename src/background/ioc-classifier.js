@@ -1,5 +1,3 @@
-// Riconoscimento e normalizzazione degli IOC selezionati dall'utente.
-
 const IPV4_RE = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
 const IPV6_RE = /^[0-9a-fA-F:]+:[0-9a-fA-F:]*$/;
 

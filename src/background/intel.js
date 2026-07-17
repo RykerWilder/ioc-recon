@@ -1,5 +1,3 @@
-// Chiamate ai servizi esterni e aggregazione dei risultati per IP e URL/domini.
-
 const CACHE_TTL_RESULT_MS = 30 * 60 * 1000;
 const CACHE_TTL_TORLIST_MS = 60 * 60 * 1000;
 

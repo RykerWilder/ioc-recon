@@ -1,7 +1,3 @@
-// Questa funzione viene eseguita in isolamento dentro la pagina web tramite
-// chrome.scripting.executeScript({ func: renderPopup, args: [data, theme] }).
-// Per questo NON può fare closure su variabili esterne al service worker:
-// tutto ciò che le serve (dati IOC + tema) le arriva come argomento.
 function renderPopup(data, theme) {
   const EXISTING_ID = "__ioc_recon_popup__";
   const old = document.getElementById(EXISTING_ID);

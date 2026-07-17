@@ -1,9 +1,5 @@
-// Applica il tema condiviso (src/shared/theme.js) come CSS custom
-// properties sul root del documento, cosi popup.css e la card iniettata
-// nella pagina (inject-popup.js) partono sempre dagli stessi identici
-// valori di colore e border-radius.
 (function applyTheme() {
-  if (typeof IOC_THEME === "undefined") return; // fallback ai valori di default nel CSS
+  if (typeof IOC_THEME === "undefined") return;
   const root = document.documentElement.style;
   const { color: c, radius: r, font } = IOC_THEME;
 
@@ -128,7 +124,6 @@ chrome.storage.local.get(HISTORY_KEY, (stored) => {
   render(stored[HISTORY_KEY] || []);
 });
 
-// keep the popup in sync if it stays open while a new IOC is analyzed
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes[HISTORY_KEY]) {
     render(changes[HISTORY_KEY].newValue || []);
