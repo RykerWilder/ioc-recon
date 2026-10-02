@@ -144,8 +144,16 @@ function renderPopup(data, theme) {
       : `<span class="ioc-badge ok">🟢 ${okLabel}</span>`;
   };
 
+  const esc = (v) =>
+    String(v).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+
   const row = (label, value) =>
-    `<div class="ioc-row"><span class="ioc-label">${label}</span><span class="ioc-value">${value ?? "N/D"}</span></div>`;
+    `<div class="ioc-row"><span class="ioc-label">${label}</span><span class="ioc-value">${value == null ? "N/D" : esc(value)}</span></div>`;
+
+  const connectionRow = (conn) =>
+    conn
+      ? `<div class="ioc-row"><span class="ioc-label">Connection type</span><span class="ioc-value" title="${esc(conn.basis)}">${esc(conn.type)} <span style="color:${c.muted}; font-size:11px;">(${esc(conn.confidence)})</span></span></div>`
+      : row("Connection type", null);
 
   const sectionTitle = (label) => `<div class="ioc-section-title">${label}</div>`;
 
@@ -225,6 +233,9 @@ function renderPopup(data, theme) {
       ${data.org ? row("Organization", data.org) : ""}
       ${row("ASN", data.asn)}
       ${data.asName ? row("AS Name", data.asName) : ""}
+      ${row("ISP", data.isp)}
+      ${connectionRow(data.connection)}
+      ${data.ptr ? row("Reverse DNS", data.ptr) : ""}
       ${row("Location", data.geo?.label)}
       <div class="ioc-row"><span class="ioc-label">Tor Exit Node</span>${torBadge}</div>
     `;
@@ -255,6 +266,9 @@ function renderPopup(data, theme) {
       ${row("Resolved IP", data.ips && data.ips.length ? data.ips.join(", ") : null)}
       ${row("Location", data.geo?.label)}
       ${data.geo?.org ? row("Organization", data.geo.org) : ""}
+      ${row("ISP", data.isp)}
+      ${connectionRow(data.connection)}
+      ${data.ptr ? row("Reverse DNS", data.ptr) : ""}
       <div class="ioc-row"><span class="ioc-label">Tor Exit Node</span>${torBadge}</div>
     `;
 

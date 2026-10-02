@@ -130,22 +130,126 @@ async function resolveDns(domain) {
   return (data.Answer || []).filter((a) => a.type === 1).map((a) => a.data);
 }
 
+
+// --- Reverse DNS (PTR) via Google DoH ---
+function ptrName(ip) {
+  if (ip.includes(":")) {
+    const [head, tail] = ip.split("::");
+    const h = head ? head.split(":") : [];
+    const t = ip.includes("::") && tail ? tail.split(":") : [];
+    const fill = ip.includes("::") ? 8 - h.length - t.length : 0;
+    const groups = [...h, ...Array(Math.max(fill, 0)).fill("0"), ...t].map((g) =>
+      g.padStart(4, "0")
+    );
+    if (groups.length !== 8) return null;
+    return groups.join("").split("").reverse().join(".") + ".ip6.arpa";
+  }
+  return ip.split(".").reverse().join(".") + ".in-addr.arpa";
+}
+
+async function lookupPtr(ip) {
+  const name = ptrName(ip.trim());
+  if (!name) return null;
+  const url = `https://dns.google/resolve?name=${encodeURIComponent(name)}&type=PTR`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`PTR HTTP ${res.status}`);
+  const data = await res.json();
+  const answer = (data.Answer || []).find((a) => a.type === 12);
+  return answer ? answer.data.replace(/\.$/, "").toLowerCase() : null;
+}
+
+// --- ipapi.is: ISP / ASN type / mobile-datacenter-proxy flags (no API key) ---
+async function lookupIpapiIs(ip) {
+  const url = `https://api.ipapi.is/?q=${encodeURIComponent(ip)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`ipapi.is HTTP ${res.status}`);
+  const data = await res.json();
+  if (data.error) throw new Error(`ipapi.is: ${data.error}`);
+
+  return {
+    asnOrg: data.asn?.org || null,
+    companyName: data.company?.name || null,
+    asnType: (data.asn?.type || "").toLowerCase(),
+    companyType: (data.company?.type || "").toLowerCase(),
+    isMobile: data.is_mobile === true,
+    isDatacenter: data.is_datacenter === true,
+    isProxy: data.is_proxy === true,
+    isVpn: data.is_vpn === true,
+    isTor: data.is_tor === true
+  };
+}
+
+// --- ISP: the AS operator is the most reliable proxy for "who is the ISP" ---
+function pickIsp(ipapi, asName, rdapOrg) {
+  return (
+    ipapi?.asnOrg || asName || ipapi?.companyName || rdapOrg || null
+  );
+}
+
+// --- Connection type (heuristic: no database states "fixed line" with certainty) ---
+const PTR_MOBILE_RE = /(mobile|\blte\b|umts|gprs|hsdpa|cellular|gsm|cgnat|(^|[.-])[345]g([.-]|\d|$))/i;
+const PTR_HOSTING_RE = /(compute|amazonaws|cloud|vps|server|hosting|datacenter|colo|googleusercontent|azure)/i;
+const PTR_FIXED_RE = /(dsl|fttc|fttx|ftth|fiber|fibre|cable|docsis|broadband|dialup|dynamic|dyn-|pool|cust|resident|ppp|static)/i;
+
+function classifyConnection(ipapi, ptr) {
+  const mk = (type, confidence, basis) => ({ type, confidence, basis });
+  const ptrTxt = ptr || "";
+
+  if (ipapi) {
+    const types = [ipapi.asnType, ipapi.companyType];
+
+    if (ipapi.isMobile) return mk("Mobile", "high", "Flagged mobile by ipapi.is");
+    if (ipapi.isDatacenter || types.includes("hosting")) {
+      return mk("Hosting / Datacenter", "high", "Datacenter/hosting ASN (ipapi.is)");
+    }
+    if (ipapi.isVpn || ipapi.isProxy || ipapi.isTor) {
+      return mk("VPN / Proxy", "high", "Flagged VPN/proxy/Tor by ipapi.is");
+    }
+    if (PTR_MOBILE_RE.test(ptrTxt)) {
+      return mk("Mobile", "medium", `Mobile hint in reverse DNS (${ptrTxt})`);
+    }
+    if (types.includes("isp")) {
+      return PTR_FIXED_RE.test(ptrTxt)
+        ? mk("Fixed line", "high", `ISP ASN + fixed-line hint in reverse DNS (${ptrTxt})`)
+        : mk("Fixed line", "medium", "ISP ASN, not flagged mobile/hosting/proxy");
+    }
+    if (types.some((t) => ["business", "education", "government", "banking"].includes(t))) {
+      return mk("Business network", "medium", `ASN type: ${types.filter(Boolean).join("/")}`);
+    }
+  }
+
+  // fallback when ipapi.is is unavailable: reverse DNS only
+  if (ptrTxt) {
+    if (PTR_HOSTING_RE.test(ptrTxt)) return mk("Hosting / Datacenter", "low", `Reverse DNS: ${ptrTxt}`);
+    if (PTR_MOBILE_RE.test(ptrTxt)) return mk("Mobile", "low", `Reverse DNS: ${ptrTxt}`);
+    if (PTR_FIXED_RE.test(ptrTxt)) return mk("Fixed line", "low", `Reverse DNS: ${ptrTxt}`);
+  }
+  return mk("Unknown", "low", "Not enough data");
+}
+
 async function gatherIpIntel(ip) {
   const result = { kind: "ip", ip };
   result.abuseipdbUrl = abuseIpDbUrl(ip);
   result.shodanUrl = shodanHostUrl(ip);
 
-  const [rdap, tor, geo, asn] = await Promise.allSettled([
+  const [rdap, tor, geo, asn, ipapi, ptr] = await Promise.allSettled([
     lookupRdapIp(ip),
     isTorExitNode(ip),
     lookupGeo(ip),
-    lookupAsn(ip)
+    lookupAsn(ip),
+    lookupIpapiIs(ip),
+    lookupPtr(ip)
   ]);
 
   if (rdap.status === "fulfilled") Object.assign(result, rdap.value);
   result.isTor = tor.status === "fulfilled" ? tor.value : null;
   if (geo.status === "fulfilled") result.geo = geo.value;
   if (asn.status === "fulfilled") Object.assign(result, asn.value);
+
+  const ipapiVal = ipapi.status === "fulfilled" ? ipapi.value : null;
+  result.ptr = ptr.status === "fulfilled" ? ptr.value : null;
+  result.isp = pickIsp(ipapiVal, result.asName, result.org);
+  result.connection = classifyConnection(ipapiVal, result.ptr);
 
   return result;
 }
@@ -164,12 +268,21 @@ async function gatherUrlIntel(url, domain) {
 
   if (result.ips.length > 0) {
     const firstIp = result.ips[0];
-    const [geo, tor] = await Promise.allSettled([
+    const [geo, tor, asn, ipapi, ptr] = await Promise.allSettled([
       lookupGeo(firstIp),
-      isTorExitNode(firstIp)
+      isTorExitNode(firstIp),
+      lookupAsn(firstIp),
+      lookupIpapiIs(firstIp),
+      lookupPtr(firstIp)
     ]);
     if (geo.status === "fulfilled") result.geo = geo.value;
     result.isTor = tor.status === "fulfilled" ? tor.value : null;
+
+    const ipapiVal = ipapi.status === "fulfilled" ? ipapi.value : null;
+    const asName = asn.status === "fulfilled" ? asn.value.asName : null;
+    result.ptr = ptr.status === "fulfilled" ? ptr.value : null;
+    result.isp = pickIsp(ipapiVal, asName, result.geo?.org);
+    result.connection = classifyConnection(ipapiVal, result.ptr);
   } else {
     result.isTor = null;
   }

@@ -49,7 +49,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   await saveToHistory(historyEntry);
 
   const cacheKey =
-    classified.kind === "ip" ? `ip:${classified.ip}` : `domain:${classified.domain}`;
+    classified.kind === "ip" ? `v2:ip:${classified.ip}` : `v2:domain:${classified.domain}`;
 
   const cachedResult = await cacheGet(cacheKey);
   if (cachedResult) {
