@@ -22,6 +22,15 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
+  "commands": {
+    "ioc-recon-selection": {
+      "suggested_key": {
+        "default": "Alt+R",
+        "mac": "Alt+R"
+      },
+      "description": "IOC recon of the selected text"
+    }
+  },
   "action": {
     "default_popup": "src/popup/popup.html",
     "default_title": "IOC Recon"

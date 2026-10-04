@@ -16,10 +16,14 @@ Since it's built on Manifest V3, it works on any Chromium-based browser (Chrome,
 
 1. Load the extension (see "Installation" below).
 2. Select/highlight an IP address, a URL, or a domain on any web page.
-3. Right-click the selection → **"IOC recon of \"...\""**.
+3. Press **Alt+R** (**Option+R** on macOS), or right-click the selection → **"IOC recon of \"...\""**.
 4. A card appears in the top-right corner with the results. It stays open until you close it — either with the ✕ button or by pressing **Esc**.
 
 The extension also understands "defanged" IOCs copied from reports or threat intel feeds (e.g. `hxxp://evil[.]com`) and automatically converts them back before running the lookup.
+
+### Keyboard shortcut
+
+The default shortcut is **Alt+R** (**Option+R** on macOS). You can change it at `chrome://extensions/shortcuts` (or the equivalent page in your browser). If another extension already uses the same combination, Chrome leaves the shortcut unassigned and you'll need to set it manually from that page.
 
 ## What it shows
 
@@ -56,7 +60,7 @@ Click the extension icon in the toolbar to see the last 10 IOCs you've analyzed,
 2. Go to `chrome://extensions` (or the equivalent extensions page in your Chromium-based browser).
 3. Enable **"Developer mode"** (top-right toggle).
 4. Click **"Load unpacked"** and select the `ioc-recon` folder.
-5. Done — select an IP, URL, or domain on any page and use the context menu entry.
+5. Done — select an IP, URL, or domain on any page and use **Alt+R** or the context menu entry.
 
 ## Caching
 
