@@ -27,7 +27,7 @@ The extension also understands "defanged" IOCs copied from reports or threat int
 
 - **CIDR / Range** — the network block the IP belongs to (via RDAP, rdap.org)
 - **Network name** and **Organization**
-- **ASN** and **AS Name** (via ipinfo.io)
+- **ASN** (via ipinfo.io)
 - **Location** (city, region, country — via GeoJS)
 - **Tor Exit Node** — True/False, checked against the official Tor exit list
 - Quick links to **AbuseIPDB** and **Shodan**

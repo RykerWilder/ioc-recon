@@ -54,7 +54,7 @@ async function lookupGeo(ip) {
   };
 }
 
-// --- ASN / AS name ---
+// --- ASN ---
 async function lookupAsn(ip) {
   const url = `https://ipinfo.io/${encodeURIComponent(ip)}/json`;
   const res = await fetch(url);
@@ -63,11 +63,10 @@ async function lookupAsn(ip) {
 
   // data.org è tipicamente nella forma "AS15169 Google LLC"
   const org = data.org || "";
-  const match = org.match(/^(AS\d+)\s*(.*)$/i);
+  const match = org.match(/^(AS\d+)/i);
 
   return {
-    asn: match ? match[1].toUpperCase() : null,
-    asName: match ? match[2] || null : org || null
+    asn: match ? match[1].toUpperCase() : null
   };
 }
 
@@ -180,9 +179,9 @@ async function lookupIpapiIs(ip) {
 }
 
 // --- ISP: the AS operator is the most reliable proxy for "who is the ISP" ---
-function pickIsp(ipapi, asName, rdapOrg) {
+function pickIsp(ipapi, rdapOrg) {
   return (
-    ipapi?.asnOrg || asName || ipapi?.companyName || rdapOrg || null
+    ipapi?.asnOrg || ipapi?.companyName || rdapOrg || null
   );
 }
 
@@ -248,7 +247,7 @@ async function gatherIpIntel(ip) {
 
   const ipapiVal = ipapi.status === "fulfilled" ? ipapi.value : null;
   result.ptr = ptr.status === "fulfilled" ? ptr.value : null;
-  result.isp = pickIsp(ipapiVal, result.asName, result.org);
+  result.isp = pickIsp(ipapiVal, result.org);
   result.connection = classifyConnection(ipapiVal, result.ptr);
 
   return result;
@@ -268,10 +267,9 @@ async function gatherUrlIntel(url, domain) {
 
   if (result.ips.length > 0) {
     const firstIp = result.ips[0];
-    const [geo, tor, asn, ipapi, ptr] = await Promise.allSettled([
+    const [geo, tor, ipapi, ptr] = await Promise.allSettled([
       lookupGeo(firstIp),
       isTorExitNode(firstIp),
-      lookupAsn(firstIp),
       lookupIpapiIs(firstIp),
       lookupPtr(firstIp)
     ]);
@@ -279,9 +277,8 @@ async function gatherUrlIntel(url, domain) {
     result.isTor = tor.status === "fulfilled" ? tor.value : null;
 
     const ipapiVal = ipapi.status === "fulfilled" ? ipapi.value : null;
-    const asName = asn.status === "fulfilled" ? asn.value.asName : null;
     result.ptr = ptr.status === "fulfilled" ? ptr.value : null;
-    result.isp = pickIsp(ipapiVal, asName, result.geo?.org);
+    result.isp = pickIsp(ipapiVal, result.geo?.org);
     result.connection = classifyConnection(ipapiVal, result.ptr);
   } else {
     result.isTor = null;

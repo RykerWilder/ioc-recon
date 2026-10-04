@@ -232,7 +232,6 @@ function renderPopup(data, theme) {
       ${row("Network name", data.name)}
       ${data.org ? row("Organization", data.org) : ""}
       ${row("ASN", data.asn)}
-      ${data.asName ? row("AS Name", data.asName) : ""}
       ${row("ISP", data.isp)}
       ${connectionRow(data.connection)}
       ${data.ptr ? row("Reverse DNS", data.ptr) : ""}
