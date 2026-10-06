@@ -17,16 +17,21 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
+async function showCard(tabId, data) {
+  const autoCloseMs = await getAutoCloseMs();
+  chrome.scripting.executeScript({
+    target: { tabId },
+    func: renderPopup,
+    args: [data, IOC_THEME, { autoCloseMs }]
+  });
+}
+
 async function runRecon(rawSelection, tabId) {
   const raw = (rawSelection || "").trim();
   const classified = classifySelection(raw);
 
   if (classified.kind === "invalid") {
-    chrome.scripting.executeScript({
-      target: { tabId },
-      func: renderPopup,
-      args: [{ error: "The selection is neither a valid IP nor URL/domain" }, IOC_THEME]
-    });
+    showCard(tabId, { error: "The selection is neither a valid IP nor URL/domain" });
     return;
   }
 
@@ -52,11 +57,7 @@ async function runRecon(rawSelection, tabId) {
 
   const cachedResult = await cacheGet(cacheKey);
   if (cachedResult) {
-    chrome.scripting.executeScript({
-      target: { tabId },
-      func: renderPopup,
-      args: [{ ...cachedResult, cached: true }, IOC_THEME]
-    });
+    showCard(tabId, { ...cachedResult, cached: true });
     return;
   }
 
@@ -67,11 +68,7 @@ async function runRecon(rawSelection, tabId) {
 
   await cacheSet(cacheKey, result, CACHE_TTL_RESULT_MS);
 
-  chrome.scripting.executeScript({
-    target: { tabId },
-    func: renderPopup,
-    args: [result, IOC_THEME]
-  });
+  showCard(tabId, result);
 }
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
@@ -107,11 +104,7 @@ chrome.commands.onCommand.addListener(async (command, tab) => {
   }
 
   if (!raw) {
-    chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: renderPopup,
-      args: [{ error: "No text selected. Select an IP, URL or domain first." }, IOC_THEME]
-    });
+    showCard(tab.id, { error: "No text selected. Select an IP, URL or domain first." });
     return;
   }
 

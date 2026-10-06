@@ -1,8 +1,9 @@
-function renderPopup(data, theme) {
+function renderPopup(data, theme, options = {}) {
   const EXISTING_ID = "__ioc_recon_popup__";
   const old = document.getElementById(EXISTING_ID);
   if (old) {
     if (old.__escHandler) document.removeEventListener("keydown", old.__escHandler);
+    if (old.__closeTimer) clearTimeout(old.__closeTimer);
     old.remove();
   }
 
@@ -33,7 +34,6 @@ function renderPopup(data, theme) {
     document.body.removeChild(ta);
   };
 
-  // Lo style tag viene sempre riscritto, mai "congelato".
   const STYLE_ID = "__ioc_recon_style__";
   let styleEl = document.getElementById(STYLE_ID);
   if (!styleEl) {
@@ -89,7 +89,6 @@ function renderPopup(data, theme) {
     #${EXISTING_ID} ::-webkit-scrollbar-thumb { background: ${c.accent}; border-radius: ${r.pill}; }
   `;
 
-  // --- base box ---
   const box = document.createElement("div");
   box.id = EXISTING_ID;
   Object.assign(box.style, {
@@ -114,22 +113,23 @@ function renderPopup(data, theme) {
   const closeBtn = document.createElement("div");
   closeBtn.textContent = "✕";
   closeBtn.className = "ioc-close-btn";
-  closeBtn.onclick = () => {
+  const closeBox = () => {
+    clearTimeout(box.__closeTimer);
     document.removeEventListener("keydown", escHandler);
     box.remove();
   };
+  closeBtn.onclick = closeBox;
 
-  // X o ESC per chiudere
   const escHandler = (e) => {
-    if (e.key === "Escape") {
-      document.removeEventListener("keydown", escHandler);
-      box.remove();
-    }
+    if (e.key === "Escape") closeBox();
   };
   document.addEventListener("keydown", escHandler);
   box.__escHandler = escHandler;
 
-  // --- caso di errore ---
+  if (options.autoCloseMs > 0) {
+    box.__closeTimer = setTimeout(closeBox, options.autoCloseMs);
+  }
+
   if (data.error) {
     box.innerHTML = `<div style="font-weight:700; margin-bottom:4px;">⚠️ Error</div><div style="color:${c.muted};">${data.error}</div>`;
     box.appendChild(closeBtn);

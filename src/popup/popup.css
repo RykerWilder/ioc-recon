@@ -153,3 +153,75 @@ body {
   font-size: 12px;
   font-weight: 700;
 }
+
+/* ---- footer: auto-close toggle ---- */
+.popup-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--ioc-border, rgba(201, 154, 91, 0.15));
+  flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.footer-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.footer-title {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.footer-sub {
+  font-size: 10.5px;
+  color: var(--ioc-muted, #9fb0c9);
+}
+
+.switch-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 34px;
+  height: 20px;
+  border-radius: var(--ioc-radius-pill, 999px);
+  background: var(--ioc-border, rgba(201, 154, 91, 0.15));
+  transition: background 0.15s ease;
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--ioc-muted, #9fb0c9);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.switch-input:checked + .switch {
+  background: var(--ioc-accent, #c9691a);
+}
+
+.switch-input:checked + .switch::after {
+  transform: translateX(14px);
+  background: #fdecd8;
+}
+
+.switch-input:focus-visible + .switch {
+  outline: 2px solid var(--ioc-accent-hover, #e07a24);
+  outline-offset: 2px;
+}
