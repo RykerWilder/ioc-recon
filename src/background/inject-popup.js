@@ -76,8 +76,8 @@ function renderPopup(data, theme, options = {}) {
     #${EXISTING_ID} .ioc-link-btn.abuseipdb:hover { background: ${c.accentHover}; }
     #${EXISTING_ID} .ioc-link-btn.virustotal { background: ${c.virustotal}; color: #ffffff; }
     #${EXISTING_ID} .ioc-link-btn.virustotal:hover { background: ${c.virustotalHover}; }
-    #${EXISTING_ID} .ioc-link-btn.shodan { background: ${c.shodan}; color: #ffffff; }
-    #${EXISTING_ID} .ioc-link-btn.shodan:hover { background: ${c.shodanHover}; }
+    #${EXISTING_ID} .ioc-link-btn.spur { background: ${c.spur}; color: #ffffff; }
+    #${EXISTING_ID} .ioc-link-btn.spur:hover { background: ${c.spurHover}; }
     #${EXISTING_ID} .ioc-close-btn {
       position: absolute; top: 10px; right: 12px; cursor: pointer;
       width: 22px; height: 22px; border-radius: ${r.close}; display: flex;
@@ -198,9 +198,9 @@ function renderPopup(data, theme, options = {}) {
     data.kind === "ip"
       ? data.abuseipdbUrl || `https://www.abuseipdb.com/check/${encodeURIComponent(data.ip)}`
       : null;
-  const shodanUrl =
+  const spurUrl =
     data.kind === "ip"
-      ? data.shodanUrl || `https://www.shodan.io/host/${encodeURIComponent(data.ip)}`
+      ? data.spurUrl || `https://spur.us/context/${encodeURIComponent(data.ip)}`
       : null;
   const toBase64UrlLocal = (str) => {
     const b64 = btoa(unescape(encodeURIComponent(str)));
@@ -240,7 +240,7 @@ function renderPopup(data, theme, options = {}) {
     `;
 
     actionRow.appendChild(makeLinkButton("Open on AbuseIPDB ↗", abuseipdbUrl, "abuseipdb"));
-    actionRow.appendChild(makeLinkButton("Open on Shodan ↗", shodanUrl, "shodan"));
+    actionRow.appendChild(makeLinkButton("Open on Spur ↗", spurUrl, "spur"));
     actionRow.appendChild(makeCopyButton("Copy defanged IP", defangIp(data.ip)));
   }
 

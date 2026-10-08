@@ -3,7 +3,7 @@
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?logo=javascript&logoColor=black&labelColor=F7DF1E)
 ![VirusTotal](https://img.shields.io/badge/VirusTotal-394EFF?style=flat&logo=virustotal&logoColor=white)
-![Shodan](https://img.shields.io/badge/Shodan-EE1C2E?style=flat&logo=shodan&logoColor=white)
+![Spur](https://img.shields.io/badge/Spur-7C3AED?style=flat)
 ![AbuseIPDB](https://img.shields.io/badge/AbuseIPDB-1E1E1E?style=flat)
 
 ![IOC Recon](https://github.com/RykerWilder/static_files/blob/main/ioc-recon.gif)
@@ -34,7 +34,7 @@ The default shortcut is **Alt+R** (**Option+R** on macOS). You can change it at 
 - **ASN** (via ipinfo.io)
 - **Location** (city, region, country — via GeoJS)
 - **Tor Exit Node** — True/False, checked against the official Tor exit list
-- Quick links to **AbuseIPDB** and **Shodan**
+- Quick links to **AbuseIPDB** and **Spur**
 
 ### If you select a URL or domain
 
@@ -79,5 +79,5 @@ Expired entries are automatically discarded on next access.
 - ipinfo.io: https://ipinfo.io
 - Tor Project bulk exit list: https://check.torproject.org/torbulkexitlist
 - AbuseIPDB (link only): https://www.abuseipdb.com
-- Shodan (link only): https://www.shodan.io
+- Spur (link only): https://spur.us
 - VirusTotal (link only): https://www.virustotal.com

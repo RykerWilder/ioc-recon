@@ -15,8 +15,8 @@ function virusTotalUrlLink(url) {
   return `https://www.virustotal.com/gui/url/${id}`;
 }
 
-function shodanHostUrl(ip) {
-  return `https://www.shodan.io/host/${encodeURIComponent(ip)}`;
+function spurContextUrl(ip) {
+  return `https://spur.us/context/${encodeURIComponent(ip)}`;
 }
 
 // --- Tor Exit List ---
@@ -229,7 +229,7 @@ function classifyConnection(ipapi, ptr) {
 async function gatherIpIntel(ip) {
   const result = { kind: "ip", ip };
   result.abuseipdbUrl = abuseIpDbUrl(ip);
-  result.shodanUrl = shodanHostUrl(ip);
+  result.spurUrl = spurContextUrl(ip);
 
   const [rdap, tor, geo, asn, ipapi, ptr] = await Promise.allSettled([
     lookupRdapIp(ip),

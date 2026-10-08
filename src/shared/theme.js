@@ -28,8 +28,8 @@ const IOC_THEME = {
     urlBadgeBg: "rgba(34, 197, 94, 0.15)",
     virustotal: "#394eff",
     virustotalHover: "#2d3ecc",
-    shodan: "#cc0000",
-    shodanHover: "#a30000",
+    spur: "#7c3aed",
+    spurHover: "#6226c4",
     copied: "#22c55e"
   },
   font: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif",
