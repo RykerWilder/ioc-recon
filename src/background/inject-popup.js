@@ -239,9 +239,9 @@ function renderPopup(data, theme, options = {}) {
       <div class="ioc-row"><span class="ioc-label">Tor Exit Node</span>${torBadge}</div>
     `;
 
-    actionRow.appendChild(makeLinkButton("Open on AbuseIPDB ↗", abuseipdbUrl, "abuseipdb"));
-    actionRow.appendChild(makeLinkButton("Open on Spur ↗", spurUrl, "spur"));
-    actionRow.appendChild(makeCopyButton("Copy defanged IP", defangIp(data.ip)));
+    actionRow.appendChild(makeLinkButton("AbuseIPDB ↗", abuseipdbUrl, "abuseipdb"));
+    actionRow.appendChild(makeLinkButton("Spur ↗", spurUrl, "spur"));
+    actionRow.appendChild(makeCopyButton("Copy defanged", defangIp(data.ip)));
   }
 
   // ---------------------------------------------------------------------
