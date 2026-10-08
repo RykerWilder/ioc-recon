@@ -15,6 +15,10 @@ function virusTotalUrlLink(url) {
   return `https://www.virustotal.com/gui/url/${id}`;
 }
 
+function whoisUrl(domain) {
+  return `https://whois.domaintools.com/${encodeURIComponent(domain)}`;
+}
+
 function spurContextUrl(ip) {
   return `https://spur.us/context/${encodeURIComponent(ip)}`;
 }
@@ -256,6 +260,7 @@ async function gatherIpIntel(ip) {
 async function gatherUrlIntel(url, domain) {
   const result = { kind: "url", url, domain };
   result.virustotalUrl = virusTotalUrlLink(url);
+  result.whoisUrl = whoisUrl(domain);
 
   const [rdap, ipsResult] = await Promise.allSettled([
     lookupRdapDomain(domain),

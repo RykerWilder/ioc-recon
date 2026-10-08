@@ -28,6 +28,8 @@ const IOC_THEME = {
     urlBadgeBg: "rgba(34, 197, 94, 0.15)",
     virustotal: "#394eff",
     virustotalHover: "#2d3ecc",
+    whois: "#0d9488",
+    whoisHover: "#0a766d",
     spur: "#7c3aed",
     spurHover: "#6226c4",
     copied: "#22c55e"

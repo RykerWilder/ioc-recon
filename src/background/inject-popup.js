@@ -76,6 +76,8 @@ function renderPopup(data, theme, options = {}) {
     #${EXISTING_ID} .ioc-link-btn.abuseipdb:hover { background: ${c.accentHover}; }
     #${EXISTING_ID} .ioc-link-btn.virustotal { background: ${c.virustotal}; color: #ffffff; }
     #${EXISTING_ID} .ioc-link-btn.virustotal:hover { background: ${c.virustotalHover}; }
+    #${EXISTING_ID} .ioc-link-btn.whois { background: ${c.whois}; color: #ffffff; }
+    #${EXISTING_ID} .ioc-link-btn.whois:hover { background: ${c.whoisHover}; }
     #${EXISTING_ID} .ioc-link-btn.spur { background: ${c.spur}; color: #ffffff; }
     #${EXISTING_ID} .ioc-link-btn.spur:hover { background: ${c.spurHover}; }
     #${EXISTING_ID} .ioc-close-btn {
@@ -202,6 +204,10 @@ function renderPopup(data, theme, options = {}) {
     data.kind === "ip"
       ? data.spurUrl || `https://spur.us/context/${encodeURIComponent(data.ip)}`
       : null;
+  const whoisUrl =
+    data.kind === "url"
+      ? data.whoisUrl || `https://whois.domaintools.com/${encodeURIComponent(data.domain)}`
+      : null;
   const toBase64UrlLocal = (str) => {
     const b64 = btoa(unescape(encodeURIComponent(str)));
     return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -271,9 +277,10 @@ function renderPopup(data, theme, options = {}) {
       <div class="ioc-row"><span class="ioc-label">Tor Exit Node</span>${torBadge}</div>
     `;
 
-    actionRow.appendChild(makeLinkButton("Open on VirusTotal ↗", virustotalUrl, "virustotal"));
-    actionRow.appendChild(makeCopyButton("Copy defanged URL", defangUrl(data.url)));
-    actionRow.appendChild(makeCopyButton("Copy defanged domain", defangUrl(data.domain)));
+    actionRow.appendChild(makeLinkButton("VirusTotal ↗", virustotalUrl, "virustotal"));
+    actionRow.appendChild(makeLinkButton("WHOIS ↗", whoisUrl, "whois"));
+    actionRow.appendChild(makeCopyButton("Defanged URL", defangUrl(data.url)));
+    actionRow.appendChild(makeCopyButton("Defanged domain", defangUrl(data.domain)));
   }
 
   box.appendChild(actionRow);

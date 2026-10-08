@@ -42,7 +42,7 @@ The default shortcut is **Alt+R** (**Option+R** on macOS). You can change it at 
 - **Resolved IP** (via Google DNS)
 - **Location** and **Organization** of the resolved IP
 - **Tor Exit Node**, checked against the resolved IP
-- Quick link to **VirusTotal**
+- Quick links to **VirusTotal** and **WHOIS**
 
 If the selected text is neither a valid IP nor a valid URL/domain, the card shows an error message instead.
 
@@ -81,3 +81,4 @@ Expired entries are automatically discarded on next access.
 - AbuseIPDB (link only): https://www.abuseipdb.com
 - Spur (link only): https://spur.us
 - VirusTotal (link only): https://www.virustotal.com
+- WHOIS (link only): https://whois.domaintools.com
