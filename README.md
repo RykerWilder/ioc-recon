@@ -17,7 +17,7 @@ Since it's built on Manifest V3, it works on any Chromium-based browser (Chrome,
 1. Load the extension (see "Installation" below).
 2. Select/highlight an IP address, a URL, or a domain on any web page.
 3. Press **Alt+R** (**Option+R** on macOS), or right-click the selection → **"IOC recon of \"...\""**.
-4. A card appears in the top-right corner with the results. By default it stays open until you close it — either with the ✕ button or by pressing **Esc**. If you prefer, you can enable **Auto-close result card** from the toolbar popup: the card then disappears by itself after 5 seconds (✕ and **Esc** keep working).
+4. A card appears right next to the selected IOC (below it, or above if there isn't enough room) with the results. By default it stays open until you close it — either with the ✕ button or by pressing **Esc**. If you prefer, you can enable **Auto-close result card** from the toolbar popup: the card then disappears by itself after 5 seconds (✕ and **Esc** keep working).
 
 The extension also understands "defanged" IOCs copied from reports or threat intel feeds (e.g. `hxxp://evil[.]com`) and automatically converts them back before running the lookup.
 

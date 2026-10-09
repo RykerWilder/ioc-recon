@@ -109,8 +109,46 @@ function renderPopup(data, theme, options = {}) {
     lineHeight: "1.4",
     maxHeight: "80vh",
     overflowY: "auto",
-    animation: "iocFadeIn 0.18s ease-out"
+    animation: "iocFadeIn 0.18s ease-out",
+    visibility: "hidden" // shown only after it has been positioned
   });
+
+  // Places the card next to the selected IOC (below it, or above if there is no room),
+  // always keeping it inside the visible viewport. Without an anchor it keeps the
+  // default top-right position.
+  const positionBox = () => {
+    const a = options.anchor;
+    if (a) {
+      const MARGIN = 12;
+      const GAP = 8;
+      const vw = document.documentElement.clientWidth;
+      const vh = document.documentElement.clientHeight;
+
+      // Anchor in viewport coordinates (page coordinates minus current scroll)
+      const selLeft = a.x - window.scrollX;
+      const selTop = a.y - window.scrollY;
+      const selBottom = selTop + a.h;
+
+      box.style.maxHeight = Math.min(vh * 0.8, vh - MARGIN * 2) + "px";
+      const w = box.offsetWidth;
+      const h = box.offsetHeight;
+
+      let left = Math.min(Math.max(selLeft, MARGIN), Math.max(MARGIN, vw - w - MARGIN));
+
+      const spaceBelow = vh - selBottom - GAP - MARGIN;
+      const spaceAbove = selTop - GAP - MARGIN;
+      let top;
+      if (h <= spaceBelow) top = selBottom + GAP;
+      else if (h <= spaceAbove) top = selTop - GAP - h;
+      else top = spaceBelow >= spaceAbove ? selBottom + GAP : selTop - GAP - h;
+      top = Math.min(Math.max(top, MARGIN), Math.max(MARGIN, vh - h - MARGIN));
+
+      box.style.left = left + "px";
+      box.style.top = top + "px";
+      box.style.right = "auto";
+    }
+    box.style.visibility = "visible";
+  };
 
   const closeBtn = document.createElement("div");
   closeBtn.textContent = "✕";
@@ -136,6 +174,7 @@ function renderPopup(data, theme, options = {}) {
     box.innerHTML = `<div style="font-weight:700; margin-bottom:4px;">⚠️ Error</div><div style="color:${c.muted};">${data.error}</div>`;
     box.appendChild(closeBtn);
     document.body.appendChild(box);
+    positionBox();
     return;
   }
 
@@ -286,4 +325,5 @@ function renderPopup(data, theme, options = {}) {
   box.appendChild(actionRow);
   box.appendChild(closeBtn);
   document.body.appendChild(box);
+  positionBox();
 }
