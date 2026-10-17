@@ -21,6 +21,18 @@ Since it's built on Manifest V3, it works on any Chromium-based browser (Chrome,
 
 The extension also understands "defanged" IOCs copied from reports or threat intel feeds (e.g. `hxxp://evil[.]com`) and automatically converts them back before running the lookup.
 
+### Multiple IPs and messy selections
+
+You don't need to select an IP precisely, nor one at a time:
+
+- **Surrounding noise is ignored.** `,;.10.10.10.10`, `"10.10.10.10",` or `(10.10.10.10)` are all analyzed as `10.10.10.10`.
+- **Several IPs at once.** Select a block of text containing multiple IPs, separated by commas, semicolons, spaces, pipes or new lines (e.g. `10.10.10.10, 10.10.10.20; 30.30.30.30`) and every IP is analyzed. Defanged IPs (`10[.]10[.]10[.]10`) work too, and duplicates are analyzed only once.
+- **IPs inside text.** A whole log line works: only the valid IPs are picked up (`src=10.10.10.10`, `10.10.10.10:8080`, ...). Timestamps, MAC addresses and version strings (`1.2.3.4.5`) are not mistaken for IPs.
+- **One card, one entry per IP.** With more than one IP the card shows a collapsible entry per address (country · ASN · ISP at a glance, plus a Tor badge), a **Copy all defanged** button, and the full details of each IP when expanded.
+- **Limit: 10 IPs per selection.** If more are found, the first 10 are analyzed and the card says how many were skipped.
+
+URLs and domains are still analyzed one at a time. If a selection contains both IPs and a URL/domain, only the IPs are analyzed.
+
 ### Keyboard shortcut
 
 The default shortcut is **Alt+R** (**Option+R** on macOS). You can change it at `chrome://extensions/shortcuts` (or the equivalent page in your browser). If another extension already uses the same combination, Chrome leaves the shortcut unassigned and you'll need to set it manually from that page.
@@ -44,7 +56,7 @@ The default shortcut is **Alt+R** (**Option+R** on macOS). You can change it at 
 - **Tor Exit Node**, checked against the resolved IP
 - Quick links to **VirusTotal** and **WHOIS**
 
-If the selected text is neither a valid IP nor a valid URL/domain, the card shows an error message instead.
+If the selected text contains no valid IP and is not a valid URL/domain, the card shows an error message instead.
 
 ## Copying IOCs safely
 
@@ -52,7 +64,7 @@ Every card includes buttons to copy a **defanged** version of the IOC (e.g. `1[.
 
 ## IOC history
 
-Click the extension icon in the toolbar to see the last 10 IOCs you've analyzed, most recent first. Each entry shows the IOC value, how long ago it was checked, and a one-click button to copy its defanged form — handy for quickly re-pasting an IOC into a report without re-running the lookup.
+Click the extension icon in the toolbar to see the last 10 IOCs you've analyzed (every IP of a multi-IP selection gets its own entry), most recent first. Each entry shows the IOC value, how long ago it was checked, and a one-click button to copy its defanged form — handy for quickly re-pasting an IOC into a report without re-running the lookup.
 
 ## Installation (developer mode)
 

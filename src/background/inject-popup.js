@@ -87,6 +87,19 @@ function renderPopup(data, theme, options = {}) {
       transition: background 0.15s ease, color 0.15s ease;
     }
     #${EXISTING_ID} .ioc-close-btn:hover { background: ${c.rowHover}; color: ${c.text}; }
+    #${EXISTING_ID} .ioc-acc { border: 1px solid ${c.border}; border-radius: ${r.row}; margin-bottom: 6px; overflow: hidden; }
+    #${EXISTING_ID} .ioc-acc-head {
+      display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+      cursor: pointer; font-size: 12.5px; user-select: none;
+    }
+    #${EXISTING_ID} .ioc-acc-head:hover { background: ${c.rowHover}; }
+    #${EXISTING_ID} .ioc-acc-caret { color: ${c.muted}; font-size: 10px; width: 10px; flex: none; }
+    #${EXISTING_ID} .ioc-acc-ip { font-weight: 700; flex: none; }
+    #${EXISTING_ID} .ioc-acc-meta {
+      color: ${c.muted}; font-size: 11px; flex: 1; min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    #${EXISTING_ID} .ioc-acc-body { padding: 0 10px 10px 10px; border-top: 1px solid ${c.border}; }
     #${EXISTING_ID} ::-webkit-scrollbar { width: 6px; }
     #${EXISTING_ID} ::-webkit-scrollbar-thumb { background: ${c.accent}; border-radius: ${r.pill}; }
   `;
@@ -198,16 +211,28 @@ function renderPopup(data, theme, options = {}) {
 
   const sectionTitle = (label) => `<div class="ioc-section-title">${label}</div>`;
 
-  const actionRow = document.createElement("div");
-  Object.assign(actionRow.style, {
-    marginTop: "14px",
-    paddingTop: "12px",
-    borderTop: `1px solid ${c.border}`,
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    flexWrap: "wrap"
-  });
+  if (data.loading) {
+    box.innerHTML = `<div style="font-weight:700; font-size:14px;">⏳&nbsp;${esc(data.loading)}</div>`;
+    box.appendChild(closeBtn);
+    document.body.appendChild(box);
+    positionBox();
+    return;
+  }
+
+  const newActionRow = () => {
+    const el = document.createElement("div");
+    Object.assign(el.style, {
+      marginTop: "14px",
+      paddingTop: "12px",
+      borderTop: `1px solid ${c.border}`,
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+      flexWrap: "wrap"
+    });
+    return el;
+  };
+  const actionRow = newActionRow();
 
   const makeCopyButton = (label, textToCopy) => {
     const btn = document.createElement("button");
@@ -235,14 +260,6 @@ function renderPopup(data, theme, options = {}) {
     return btn;
   };
 
-  const abuseipdbUrl =
-    data.kind === "ip"
-      ? data.abuseipdbUrl || `https://www.abuseipdb.com/check/${encodeURIComponent(data.ip)}`
-      : null;
-  const spurUrl =
-    data.kind === "ip"
-      ? data.spurUrl || `https://spur.us/context/${encodeURIComponent(data.ip)}`
-      : null;
   const whoisUrl =
     data.kind === "url"
       ? data.whoisUrl || `https://whois.domaintools.com/${encodeURIComponent(data.domain)}`
@@ -261,32 +278,127 @@ function renderPopup(data, theme, options = {}) {
     : "";
 
   // ---------------------------------------------------------------------
-  // IP
+  // IP (shared by the single-IP card and the multi-IP accordion)
   // ---------------------------------------------------------------------
-  if (data.kind === "ip") {
-    const torBadge = badge(data.isTor, "False", "True");
-
-    box.innerHTML = `
-      <div style="font-weight:700; font-size:15px; margin-bottom:2px; display:flex; align-items:center;">
-        🔎&nbsp;${data.ip}${cachedTag}
-      </div>
-
+  const ipRowsHtml = (d) => `
       ${sectionTitle("Network")}
-      ${row("CIDR", data.cidr || (data.range ? null : "N/D"))}
-      ${data.range && !data.cidr ? row("Range", data.range) : ""}
-      ${row("Network name", data.name)}
-      ${data.org ? row("Organization", data.org) : ""}
-      ${row("ASN", data.asn)}
-      ${row("ISP", data.isp)}
-      ${connectionRow(data.connection)}
-      ${data.ptr ? row("Reverse DNS", data.ptr) : ""}
-      ${row("Location", data.geo?.label)}
-      <div class="ioc-row"><span class="ioc-label">Tor Exit Node</span>${torBadge}</div>
+      ${row("CIDR", d.cidr || (d.range ? null : "N/D"))}
+      ${d.range && !d.cidr ? row("Range", d.range) : ""}
+      ${row("Network name", d.name)}
+      ${d.org ? row("Organization", d.org) : ""}
+      ${row("ASN", d.asn)}
+      ${row("ISP", d.isp)}
+      ${connectionRow(d.connection)}
+      ${d.ptr ? row("Reverse DNS", d.ptr) : ""}
+      ${row("Location", d.geo?.label)}
+      <div class="ioc-row"><span class="ioc-label">Tor Exit Node</span>${badge(d.isTor, "False", "True")}</div>
     `;
 
-    actionRow.appendChild(makeLinkButton("AbuseIPDB ↗", abuseipdbUrl, "abuseipdb"));
-    actionRow.appendChild(makeLinkButton("Spur ↗", spurUrl, "spur"));
-    actionRow.appendChild(makeCopyButton("Copy defanged", defangIp(data.ip)));
+  const makeIpActions = (d) => {
+    const el = newActionRow();
+    const abuseipdbUrl =
+      d.abuseipdbUrl || `https://www.abuseipdb.com/check/${encodeURIComponent(d.ip)}`;
+    const spurUrl = d.spurUrl || `https://spur.us/context/${encodeURIComponent(d.ip)}`;
+    el.appendChild(makeLinkButton("AbuseIPDB ↗", abuseipdbUrl, "abuseipdb"));
+    el.appendChild(makeLinkButton("Spur ↗", spurUrl, "spur"));
+    el.appendChild(makeCopyButton("Copy defanged", defangIp(d.ip)));
+    return el;
+  };
+
+  if (data.kind === "ip") {
+    box.innerHTML = `
+      <div style="font-weight:700; font-size:15px; margin-bottom:2px; display:flex; align-items:center;">
+        🔎&nbsp;${esc(data.ip)}${cachedTag}
+      </div>
+      ${ipRowsHtml(data)}
+    `;
+    box.appendChild(makeIpActions(data));
+    box.appendChild(closeBtn);
+    document.body.appendChild(box);
+    positionBox();
+    return;
+  }
+
+  // ---------------------------------------------------------------------
+  // MULTIPLE IPs: one collapsible entry per IP
+  // ---------------------------------------------------------------------
+  if (data.kind === "ips") {
+    const items = data.items || [];
+
+    // Keeps the card inside the viewport after an entry is expanded
+    const clampBox = () => {
+      const MARGIN = 12;
+      const vh = document.documentElement.clientHeight;
+      const rect = box.getBoundingClientRect();
+      if (rect.bottom > vh - MARGIN) {
+        box.style.top = Math.max(MARGIN, vh - MARGIN - rect.height) + "px";
+      }
+    };
+
+    const header = document.createElement("div");
+    header.style.cssText = "font-weight:700; font-size:15px; margin-bottom:10px; padding-right:24px;";
+    header.textContent = `🔎 ${items.length} IPs analyzed`;
+    box.appendChild(header);
+
+    items.forEach((d, i) => {
+      const entry = document.createElement("div");
+      entry.className = "ioc-acc";
+
+      const head = document.createElement("div");
+      head.className = "ioc-acc-head";
+
+      const meta = [d.geo?.countryCode, d.asn, d.isp].filter(Boolean).join(" · ");
+      const torTag = d.isTor === true ? `<span class="ioc-badge bad">🟠 Tor</span>` : "";
+      const cacheTag = d.cached
+        ? `<span style="font-size:10px; color:${c.muted}; background:${c.naBg}; padding:1px 6px; border-radius:${r.pill};">cache</span>`
+        : "";
+      head.innerHTML = `
+        <span class="ioc-acc-caret">▸</span>
+        <span class="ioc-acc-ip">${esc(d.ip)}</span>
+        ${cacheTag}
+        <span class="ioc-acc-meta" title="${esc(meta)}">${esc(meta)}</span>
+        ${torTag}
+      `;
+
+      const body = document.createElement("div");
+      body.className = "ioc-acc-body";
+      body.innerHTML = ipRowsHtml(d);
+      body.appendChild(makeIpActions(d));
+
+      const caret = head.querySelector(".ioc-acc-caret");
+      const setOpen = (open) => {
+        body.style.display = open ? "block" : "none";
+        caret.textContent = open ? "▾" : "▸";
+      };
+      setOpen(i === 0);
+      head.onclick = () => {
+        setOpen(body.style.display === "none");
+        clampBox();
+      };
+
+      entry.appendChild(head);
+      entry.appendChild(body);
+      box.appendChild(entry);
+    });
+
+    const footer = newActionRow();
+    footer.style.marginTop = "8px";
+    footer.appendChild(
+      makeCopyButton("Copy all defanged", items.map((d) => defangIp(d.ip)).join("\n"))
+    );
+    box.appendChild(footer);
+
+    if (data.total && data.total > items.length) {
+      const note = document.createElement("div");
+      note.style.cssText = `margin-top:8px; font-size:11px; color:${c.muted};`;
+      note.textContent = `Showing the first ${items.length} of ${data.total} IPs found in the selection.`;
+      box.appendChild(note);
+    }
+
+    box.appendChild(closeBtn);
+    document.body.appendChild(box);
+    positionBox();
+    return;
   }
 
   // ---------------------------------------------------------------------

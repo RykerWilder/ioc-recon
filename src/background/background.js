@@ -24,7 +24,7 @@ const MIN_FRAME_HEIGHT = 300;
 
 // ctx = { frameId, anchor, vw, vh } -> position of the selected IOC (see getPageSelection)
 async function showCard(tabId, data, ctx = {}) {
-  const autoCloseMs = await getAutoCloseMs();
+  const autoCloseMs = data.loading ? 0 : await getAutoCloseMs();
   const { frameId = 0, anchor = null, vw = 0, vh = 0 } = ctx;
 
   const canAnchorInFrame =
@@ -51,34 +51,93 @@ async function showCard(tabId, data, ctx = {}) {
   }
 }
 
+// Max parallel IP lookups: each IP fires ~6 requests, so keep the burst small
+const IP_LOOKUP_CONCURRENCY = 3;
+
+// Runs fn over items with at most `limit` in flight, preserving the order of results
+async function mapWithConcurrency(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+const ipCacheKey = (ip) => `v2:ip:${ip}`;
+
+async function lookupIp(ip) {
+  const cached = await cacheGet(ipCacheKey(ip));
+  if (cached) return { ...cached, cached: true };
+
+  let result;
+  try {
+    result = await gatherIpIntel(ip);
+  } catch (_) {
+    // One failing IP must not take down the whole batch
+    return { kind: "ip", ip };
+  }
+  await cacheSet(ipCacheKey(ip), result, CACHE_TTL_RESULT_MS);
+  return result;
+}
+
+async function runIpRecon({ ips, total }, tabId, ctx) {
+  // History: saved in reverse so the first IP of the selection ends up on top
+  for (const ip of [...ips].reverse()) {
+    await saveToHistory({
+      kind: "ip",
+      value: ip,
+      defanged: defangIpValue(ip),
+      timestamp: Date.now()
+    });
+  }
+
+  // With several IPs the lookup takes a few seconds: show a placeholder card,
+  // unless everything is already cached
+  if (ips.length > 1) {
+    const cachedFlags = await Promise.all(ips.map((ip) => cacheGet(ipCacheKey(ip))));
+    if (!cachedFlags.every(Boolean)) {
+      await showCard(tabId, { loading: `Analyzing ${ips.length} IPs…` }, ctx);
+    }
+  }
+
+  const results = await mapWithConcurrency(ips, IP_LOOKUP_CONCURRENCY, lookupIp);
+
+  if (results.length === 1) {
+    showCard(tabId, results[0], ctx);
+  } else {
+    showCard(tabId, { kind: "ips", items: results, total }, ctx);
+  }
+}
+
 async function runRecon(rawSelection, tabId, ctx = {}) {
   const raw = (rawSelection || "").trim();
   const classified = classifySelection(raw);
 
   if (classified.kind === "invalid") {
-    showCard(tabId, { error: "The selection is neither a valid IP nor URL/domain" }, ctx);
+    showCard(tabId, { error: "The selection contains no valid IP, URL or domain" }, ctx);
     return;
   }
 
-  const historyEntry =
-    classified.kind === "ip"
-      ? {
-          kind: "ip",
-          value: classified.ip,
-          defanged: defangIpValue(classified.ip),
-          timestamp: Date.now()
-        }
-      : {
-          kind: "url",
-          value: classified.url,
-          domain: classified.domain,
-          defanged: defangUrlValue(classified.url),
-          timestamp: Date.now()
-        };
-  await saveToHistory(historyEntry);
+  if (classified.kind === "ips") {
+    await runIpRecon(classified, tabId, ctx);
+    return;
+  }
 
-  const cacheKey =
-    classified.kind === "ip" ? `v2:ip:${classified.ip}` : `v2:domain:${classified.domain}`;
+  // URL / domain
+  await saveToHistory({
+    kind: "url",
+    value: classified.url,
+    domain: classified.domain,
+    defanged: defangUrlValue(classified.url),
+    timestamp: Date.now()
+  });
+
+  const cacheKey = `v2:domain:${classified.domain}`;
 
   const cachedResult = await cacheGet(cacheKey);
   if (cachedResult) {
@@ -86,10 +145,7 @@ async function runRecon(rawSelection, tabId, ctx = {}) {
     return;
   }
 
-  const result =
-    classified.kind === "ip"
-      ? await gatherIpIntel(classified.ip)
-      : await gatherUrlIntel(classified.url, classified.domain);
+  const result = await gatherUrlIntel(classified.url, classified.domain);
 
   await cacheSet(cacheKey, result, CACHE_TTL_RESULT_MS);
 

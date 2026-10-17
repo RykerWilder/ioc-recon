@@ -24,16 +24,30 @@ function spurContextUrl(ip) {
 }
 
 // --- Tor Exit List ---
-async function isTorExitNode(ip) {
-  let list = await cacheGet("tor:list");
-  if (!list) {
-    const url = "https://check.torproject.org/torbulkexitlist";
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Tor exit list HTTP ${res.status}`);
-    const text = await res.text();
-    list = text.split("\n").map((l) => l.trim());
-    await cacheSet("tor:list", list, CACHE_TTL_TORLIST_MS);
+// Shared in-flight download: parallel lookups (multi-IP) must not each fetch the list
+let torListInflight = null;
+
+async function loadTorList() {
+  const cached = await cacheGet("tor:list");
+  if (cached) return cached;
+
+  if (!torListInflight) {
+    torListInflight = (async () => {
+      const res = await fetch("https://check.torproject.org/torbulkexitlist");
+      if (!res.ok) throw new Error(`Tor exit list HTTP ${res.status}`);
+      const text = await res.text();
+      const list = text.split("\n").map((l) => l.trim());
+      await cacheSet("tor:list", list, CACHE_TTL_TORLIST_MS);
+      return list;
+    })().finally(() => {
+      torListInflight = null;
+    });
   }
+  return torListInflight;
+}
+
+async function isTorExitNode(ip) {
+  const list = await loadTorList();
   return list.includes(ip.trim());
 }
 
