@@ -66,6 +66,12 @@ Every card includes buttons to copy a **defanged** version of the IOC (e.g. `1[.
 
 Click the extension icon in the toolbar to see the last 10 IOCs you've analyzed (every IP of a multi-IP selection gets its own entry), most recent first. Each entry shows the IOC value, how long ago it was checked, and a one-click button to copy its defanged form — handy for quickly re-pasting an IOC into a report without re-running the lookup.
 
+## Design
+
+The UI (toolbar popup and result card) follows the look of Argus: warm black background with a subtle grid, a single mint accent (`#3dffc5`), square corners, bracketed mono links and the Geist / Geist Mono typefaces. The design tokens live in `src/shared/theme.js` (result card) and at the top of `src/popup/popup.css` (popup).
+
+The Geist fonts are bundled in `fonts/` (SIL Open Font License 1.1, see `fonts/OFL.txt`), so the card looks the same on every page without loading anything from the web.
+
 ## Installation (developer mode)
 
 1. Extract the folder to your disk.

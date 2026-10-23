@@ -1,29 +1,47 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>IOC Recon</title>
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
-  <div class="popup-container">
-    <div class="popup-header">
-      <span class="popup-icon">🔎</span>
-      <span class="popup-title">Last analyzed IOCs</span>
-    </div>
+  <div class="popup">
+    <header class="popup-header">
+      <span class="logo">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" class="logo__mark">
+          <g fill="currentColor">
+            <circle cx="4" cy="4" r="2.2" />
+            <circle cx="12" cy="4" r="2.2" />
+            <circle cx="20" cy="4" r="2.2" />
+            <circle cx="4" cy="12" r="2.2" />
+            <circle cx="20" cy="12" r="2.2" />
+            <circle cx="4" cy="20" r="2.2" />
+            <circle cx="12" cy="20" r="2.2" />
+            <circle cx="20" cy="20" r="2.2" />
+          </g>
+          <circle cx="12" cy="12" r="3.4" fill="var(--accent)" />
+        </svg>
+        <span class="logo__text">IOC Recon</span>
+      </span>
+      <span class="popup-count mono" id="history-count"></span>
+    </header>
+
+    <h1 class="popup-title">Last analyzed IOCs</h1>
+
     <div id="history-list" class="history-list">
-      <div class="empty-state">Loading</div>
+      <div class="empty-state">Loading…</div>
     </div>
+
     <label class="popup-footer" for="auto-close-toggle">
       <span class="footer-text">
         <span class="footer-title">Auto-close result card</span>
-        <span class="footer-sub">Hide it after 10s (Esc still work)</span>
+        <span class="footer-sub">Hide it after 10s (Esc still works)</span>
       </span>
       <input type="checkbox" id="auto-close-toggle" class="switch-input" />
       <span class="switch" aria-hidden="true"></span>
     </label>
   </div>
-  <script src="../shared/theme.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

@@ -1,30 +1,3 @@
-(function applyTheme() {
-  if (typeof IOC_THEME === "undefined") return;
-  const root = document.documentElement.style;
-  const { color: c, radius: r, font } = IOC_THEME;
-
-  root.setProperty("--ioc-radius-popup", r.popup);
-  root.setProperty("--ioc-radius-row", r.row);
-  root.setProperty("--ioc-radius-button", r.button);
-  root.setProperty("--ioc-radius-pill", r.pill);
-
-  root.setProperty("--ioc-bg-top", c.bgTop);
-  root.setProperty("--ioc-bg-bottom", c.bgBottom);
-  root.setProperty("--ioc-text", c.text);
-  root.setProperty("--ioc-muted", c.muted);
-  root.setProperty("--ioc-accent", c.accent);
-  root.setProperty("--ioc-accent-hover", c.accentHover);
-  root.setProperty("--ioc-border", c.border);
-  root.setProperty("--ioc-border-soft", c.borderSoft);
-  root.setProperty("--ioc-row-hover", c.rowHover);
-  root.setProperty("--ioc-ip-badge", c.ipBadge);
-  root.setProperty("--ioc-ip-badge-bg", c.ipBadgeBg);
-  root.setProperty("--ioc-url-badge", c.urlBadge);
-  root.setProperty("--ioc-url-badge-bg", c.urlBadgeBg);
-  root.setProperty("--ioc-copied", c.copied);
-  root.setProperty("--ioc-font", font);
-})();
-
 const HISTORY_KEY = "iocHistory";
 
 function timeAgo(ts) {
@@ -35,13 +8,19 @@ function timeAgo(ts) {
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours} h ago`;
   const days = Math.floor(hours / 24);
-  return `${days} g ago`;
+  return `${days} d ago`;
 }
 
 function copyIconSvg() {
   return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="9" y="9" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2"/>
-    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="2"/>
+    <rect x="9" y="9" width="12" height="12" stroke="currentColor" stroke-width="1.75"/>
+    <path d="M5 15H3V3h12v2" stroke="currentColor" stroke-width="1.75"/>
+  </svg>`;
+}
+
+function checkIconSvg() {
+  return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 12.5l5 5L20 6.5" stroke="currentColor" stroke-width="2"/>
   </svg>`;
 }
 
@@ -64,15 +43,22 @@ function copyText(text) {
   }
 }
 
+function updateCount(n) {
+  document.getElementById("history-count").textContent = n ? `${n} / 10` : "";
+}
+
 function render(history) {
   const list = document.getElementById("history-list");
   list.innerHTML = "";
 
   if (!history || history.length === 0) {
     list.innerHTML =
-      '<div class="empty-state">No IOCs analyzed</div>';
+      '<div class="empty-state">No IOCs analyzed yet</div>';
+    updateCount(0);
     return;
   }
+
+  updateCount(Math.min(history.length, 10));
 
   history.slice(0, 10).forEach((item) => {
     const row = document.createElement("div");
@@ -106,7 +92,7 @@ function render(history) {
       copyText(item.defanged);
       copyBtn.classList.add("copied");
       const original = copyBtn.innerHTML;
-      copyBtn.innerHTML = "✓";
+      copyBtn.innerHTML = checkIconSvg();
       setTimeout(() => {
         copyBtn.innerHTML = original;
         copyBtn.classList.remove("copied");
