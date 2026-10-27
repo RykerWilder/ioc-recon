@@ -4,8 +4,13 @@
 function renderPopup(data, theme, options = {}) {
   const EXISTING_ID = "__ioc_recon_popup__";
   const old = document.getElementById(EXISTING_ID);
+  // If the user dragged the previous card (e.g. the "loading" card that is replaced by
+  // the result), the new card keeps the position they chose.
+  let carriedPos = null;
   if (old) {
+    if (old.__moved) carriedPos = { left: old.style.left, top: old.style.top };
     if (old.__escHandler) document.removeEventListener("keydown", old.__escHandler);
+    if (old.__resizeHandler) window.removeEventListener("resize", old.__resizeHandler);
     if (old.__closeTimer) clearTimeout(old.__closeTimer);
     old.remove();
   }
@@ -117,6 +122,18 @@ function renderPopup(data, theme, options = {}) {
     ${ID} ::-webkit-scrollbar-thumb:hover { background: ${c.muted}; }
     ${ID} .ioc-mono { font-family: ${mono}; font-feature-settings: "zero" 1; }
 
+    /* Drag handle: a thin bar at the top of the card (stays visible while scrolling) */
+    ${ID} .ioc-grip {
+      position: sticky; top: -20px; z-index: 0; display: flex; align-items: center; justify-content: center;
+      height: 18px; margin: -20px -20px 2px -20px;
+      background: ${c.bg}; border-bottom: 1px solid ${c.lineSoft}; color: ${c.dim};
+      cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+      transition: color 140ms ease;
+    }
+    ${ID} .ioc-grip:hover, ${ID} .ioc-grip.is-dragging { color: ${c.accent}; }
+    ${ID} .ioc-grip.is-dragging { cursor: grabbing; }
+    ${ID}.is-dragging { box-shadow: 0 32px 64px -12px rgba(0, 0, 0, 0.75); }
+
     /* Heading */
     ${ID} .ioc-head { padding-right: 36px; margin-bottom: 14px; }
     ${ID} .ioc-eyebrow {
@@ -177,7 +194,7 @@ function renderPopup(data, theme, options = {}) {
 
     /* Square icon button */
     ${ID} .ioc-close-btn {
-      position: absolute; top: 14px; right: 14px; display: grid; place-items: center;
+      position: absolute; top: 14px; right: 14px; z-index: 1; display: grid; place-items: center;
       width: 28px; height: 28px; border: 1px solid ${c.line}; background: ${c.bg}; color: ${c.muted}; cursor: pointer;
       transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
     }
@@ -221,10 +238,30 @@ function renderPopup(data, theme, options = {}) {
   // Places the card next to the selected IOC (below it, or above if there is no room),
   // always keeping it inside the visible viewport. Without an anchor it keeps the
   // default top-right position.
+  const MARGIN = 12;
+
+  // Keeps the card fully inside the visible viewport
+  const clampToViewport = (left, top) => {
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
+    const w = box.offsetWidth;
+    const h = box.offsetHeight;
+    return {
+      left: Math.min(Math.max(left, 0), Math.max(0, vw - w)),
+      top: Math.min(Math.max(top, 0), Math.max(0, vh - h))
+    };
+  };
+
   const positionBox = () => {
     const a = options.anchor;
-    if (a) {
-      const MARGIN = 12;
+    if (box.__moved) {
+      // The user moved the card: keep it where they left it (only re-clamped)
+      box.style.maxHeight = Math.min(document.documentElement.clientHeight * 0.8, document.documentElement.clientHeight - MARGIN * 2) + "px";
+      const p = clampToViewport(parseFloat(box.style.left) || 0, parseFloat(box.style.top) || 0);
+      box.style.left = p.left + "px";
+      box.style.top = p.top + "px";
+      box.style.right = "auto";
+    } else if (a) {
       const GAP = 8;
       const vw = document.documentElement.clientWidth;
       const vh = document.documentElement.clientHeight;
@@ -257,6 +294,68 @@ function renderPopup(data, theme, options = {}) {
     box.style.visibility = "visible";
   };
 
+  if (carriedPos) {
+    box.style.left = carriedPos.left;
+    box.style.top = carriedPos.top;
+    box.style.right = "auto";
+    box.__moved = true;
+  }
+
+  // Drag handle: press on the bar at the top of the card and drag it anywhere in the
+  // window. Double-click resets the card to its original position next to the IOC.
+  const grip = document.createElement("div");
+  grip.className = "ioc-grip";
+  grip.title = "Drag to move · double-click to reset position";
+  grip.setAttribute("aria-hidden", "true");
+  grip.innerHTML = `<svg width="22" height="8" viewBox="0 0 22 8" fill="currentColor"><rect x="0" y="0" width="2" height="2"/><rect x="5" y="0" width="2" height="2"/><rect x="10" y="0" width="2" height="2"/><rect x="15" y="0" width="2" height="2"/><rect x="20" y="0" width="2" height="2"/><rect x="0" y="6" width="2" height="2"/><rect x="5" y="6" width="2" height="2"/><rect x="10" y="6" width="2" height="2"/><rect x="15" y="6" width="2" height="2"/><rect x="20" y="6" width="2" height="2"/></svg>`;
+
+  let drag = null;
+  grip.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const rect = box.getBoundingClientRect();
+    drag = { dx: e.clientX - rect.left, dy: e.clientY - rect.top, id: e.pointerId };
+    // Switch from "right"-anchored (default position) to explicit left/top
+    box.style.left = rect.left + "px";
+    box.style.top = rect.top + "px";
+    box.style.right = "auto";
+    try {
+      grip.setPointerCapture(e.pointerId);
+    } catch (_) {}
+    grip.classList.add("is-dragging");
+    box.classList.add("is-dragging");
+    clearTimeout(box.__closeTimer); // do not auto-close while the user is moving the card
+  });
+  grip.addEventListener("pointermove", (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const p = clampToViewport(e.clientX - drag.dx, e.clientY - drag.dy);
+    box.style.left = p.left + "px";
+    box.style.top = p.top + "px";
+    box.__moved = true;
+  });
+  const endDrag = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag = null;
+    try {
+      grip.releasePointerCapture(e.pointerId);
+    } catch (_) {}
+    grip.classList.remove("is-dragging");
+    box.classList.remove("is-dragging");
+    if (options.autoCloseMs > 0) {
+      clearTimeout(box.__closeTimer);
+      box.__closeTimer = setTimeout(closeBox, options.autoCloseMs);
+    }
+  };
+  grip.addEventListener("pointerup", endDrag);
+  grip.addEventListener("pointercancel", endDrag);
+  grip.addEventListener("dblclick", () => {
+    box.__moved = false;
+    box.style.right = "";
+    box.style.left = "";
+    box.style.top = "";
+    positionBox();
+  });
+
   const closeBtn = document.createElement("button");
   closeBtn.type = "button";
   closeBtn.className = "ioc-close-btn";
@@ -266,6 +365,7 @@ function renderPopup(data, theme, options = {}) {
   const closeBox = () => {
     clearTimeout(box.__closeTimer);
     document.removeEventListener("keydown", escHandler);
+    window.removeEventListener("resize", resizeHandler);
     box.remove();
   };
   closeBtn.onclick = closeBox;
@@ -276,6 +376,13 @@ function renderPopup(data, theme, options = {}) {
   document.addEventListener("keydown", escHandler);
   box.__escHandler = escHandler;
 
+  // Keeps the card reachable if the window is resized
+  const resizeHandler = () => {
+    if (box.isConnected) positionBox();
+  };
+  window.addEventListener("resize", resizeHandler);
+  box.__resizeHandler = resizeHandler;
+
   if (options.autoCloseMs > 0) {
     box.__closeTimer = setTimeout(closeBox, options.autoCloseMs);
   }
@@ -283,6 +390,7 @@ function renderPopup(data, theme, options = {}) {
   // Mounts the card, positions it, and positions it again once the bundled fonts
   // are ready (they change the card's size).
   const finish = () => {
+    box.insertBefore(grip, box.firstChild);
     box.appendChild(closeBtn);
     document.body.appendChild(box);
     positionBox();
@@ -435,7 +543,6 @@ function renderPopup(data, theme, options = {}) {
 
     // Keeps the card inside the viewport after an entry is expanded
     const clampBox = () => {
-      const MARGIN = 12;
       const vh = document.documentElement.clientHeight;
       const rect = box.getBoundingClientRect();
       if (rect.bottom > vh - MARGIN) {

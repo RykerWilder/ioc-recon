@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "IOC Recon",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Quick analysis of selected IOCs (one or more IPs, or a URL/domain), with a toolbar history of your last lookups",
   "permissions": ["contextMenus", "scripting", "storage", "activeTab"],
   "host_permissions": [
