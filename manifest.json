@@ -1,18 +1,18 @@
 {
   "manifest_version": 3,
   "name": "IOC Recon",
-  "version": "1.4.0",
-  "description": "Quick analysis of selected IOCs (one or more IPs, or a URL/domain), with a toolbar history of your last lookups",
-  "permissions": ["contextMenus", "scripting", "storage", "activeTab"],
+  "version": "2.0.0",
+  "description": "Quick analysis of selected IOCs (IPs, URLs, domains) with AbuseIPDB and Proxycheck.io, with a toolbar history of your last lookups",
+  "permissions": [
+    "contextMenus",
+    "scripting",
+    "storage",
+    "activeTab"
+  ],
   "host_permissions": [
-    "https://rdap.org/*",
-    "https://dns.google/*",
-    "https://api.blocklist.de/*",
-    "https://get.geojs.io/*",
-    "https://urlscan.io/*",
-    "https://check.torproject.org/*",
-    "https://ipinfo.io/*",
-    "https://api.ipapi.is/*"
+    "https://api.abuseipdb.com/*",
+    "https://proxycheck.io/*",
+    "https://dns.google/*"
   ],
   "background": {
     "service_worker": "src/background/background.js"
@@ -37,8 +37,16 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["fonts/*.woff2"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "fonts/*.woff2"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
-  ]
+  ],
+  "options_ui": {
+    "page": "src/options/options.html",
+    "open_in_tab": true
+  }
 }

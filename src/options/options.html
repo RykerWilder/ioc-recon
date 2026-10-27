@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IOC Recon — Settings</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <main class="page">
+    <header class="page-header">
+      <span class="logo">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" class="logo__mark">
+          <g fill="currentColor">
+            <circle cx="4" cy="4" r="2.2" />
+            <circle cx="12" cy="4" r="2.2" />
+            <circle cx="20" cy="4" r="2.2" />
+            <circle cx="4" cy="12" r="2.2" />
+            <circle cx="20" cy="12" r="2.2" />
+            <circle cx="4" cy="20" r="2.2" />
+            <circle cx="12" cy="20" r="2.2" />
+            <circle cx="20" cy="20" r="2.2" />
+          </g>
+          <circle cx="12" cy="12" r="3.4" fill="var(--accent)" />
+        </svg>
+        <span class="logo__text">IOC Recon</span>
+      </span>
+    </header>
+
+    <h1 class="page-title">Settings</h1>
+
+    <section class="panel">
+      <h2 class="panel-title mono">Result card</h2>
+      <label class="toggle-row" for="auto-close-toggle">
+        <span class="toggle-text">
+          <span class="toggle-title">Auto-close result card</span>
+          <span class="toggle-sub">Hide it after 10s (✕ and Esc still work)</span>
+        </span>
+        <input type="checkbox" id="auto-close-toggle" class="switch-input" />
+        <span class="switch" aria-hidden="true"></span>
+      </label>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-title mono">API keys</h2>
+      <p class="note">
+        Keys are encrypted with AES-256-GCM before being stored. The encryption key is
+        non-extractable and never leaves this extension, and the plain-text key is never
+        saved. Once saved, a key can be replaced or removed but not displayed again.
+      </p>
+
+      <form class="key-field" data-name="abuseipdb" autocomplete="off">
+        <div class="key-head">
+          <label for="key-abuseipdb" class="key-label">AbuseIPDB</label>
+          <span class="tag tag-required mono">required</span>
+          <span class="key-status mono" id="status-abuseipdb"></span>
+        </div>
+        <div class="key-controls">
+          <input type="password" id="key-abuseipdb" class="key-input mono" spellcheck="false"
+                 autocomplete="off" autocapitalize="off" placeholder="Paste your API key" />
+          <button type="submit" class="btn btn-save">Save</button>
+          <button type="button" class="btn btn-remove">Remove</button>
+        </div>
+        <p class="key-help">
+          Score, ISP, usage type and country. Free account: 1,000 checks per day.
+          <a href="https://www.abuseipdb.com/account/api" target="_blank" rel="noopener noreferrer">Get a key ↗</a>
+        </p>
+      </form>
+
+      <form class="key-field" data-name="proxycheck" autocomplete="off">
+        <div class="key-head">
+          <label for="key-proxycheck" class="key-label">Proxycheck.io</label>
+          <span class="tag mono">optional</span>
+          <span class="key-status mono" id="status-proxycheck"></span>
+        </div>
+        <div class="key-controls">
+          <input type="password" id="key-proxycheck" class="key-input mono" spellcheck="false"
+                 autocomplete="off" autocapitalize="off" placeholder="Paste your API key" />
+          <button type="submit" class="btn btn-save">Save</button>
+          <button type="button" class="btn btn-remove">Remove</button>
+        </div>
+        <p class="key-help">
+          Proxy / VPN detection and city. Works without a key (100 queries per day);
+          a free key raises it to 1,000.
+          <a href="https://proxycheck.io/dashboard/" target="_blank" rel="noopener noreferrer">Get a key ↗</a>
+        </p>
+      </form>
+    </section>
+  </main>
+
+  <script src="../shared/secure-store.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

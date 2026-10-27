@@ -110,19 +110,22 @@ chrome.storage.local.get(HISTORY_KEY, (stored) => {
   render(stored[HISTORY_KEY] || []);
 });
 
-const AUTO_CLOSE_KEY = "autoCloseCard";
-const autoCloseToggle = document.getElementById("auto-close-toggle");
-
-chrome.storage.local.get({ [AUTO_CLOSE_KEY]: false }, (stored) => {
-  autoCloseToggle.checked = !!stored[AUTO_CLOSE_KEY];
+// Settings page (auto-close and API keys)
+document.getElementById("open-settings").addEventListener("click", () => {
+  chrome.runtime.openOptionsPage();
+  window.close();
 });
 
-autoCloseToggle.addEventListener("change", () => {
-  chrome.storage.local.set({ [AUTO_CLOSE_KEY]: autoCloseToggle.checked });
-});
+// Reminder when the (required) AbuseIPDB key has not been saved yet.
+// Only checks that an encrypted record exists: nothing is decrypted here.
+const API_KEYS_STORAGE_KEY = "apiKeys";
+function updateKeyHint(apiKeys) {
+  document.getElementById("key-hint").hidden = !!(apiKeys && apiKeys.abuseipdb);
+}
+chrome.storage.local.get(API_KEYS_STORAGE_KEY, (stored) => updateKeyHint(stored[API_KEYS_STORAGE_KEY]));
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "local" && changes[HISTORY_KEY]) {
-    render(changes[HISTORY_KEY].newValue || []);
-  }
+  if (area !== "local") return;
+  if (changes[HISTORY_KEY]) render(changes[HISTORY_KEY].newValue || []);
+  if (changes[API_KEYS_STORAGE_KEY]) updateKeyHint(changes[API_KEYS_STORAGE_KEY].newValue);
 });

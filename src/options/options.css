@@ -1,0 +1,146 @@
+/* IOC Recon settings page — same Argus look as the popup. Keep tokens in sync with
+   src/shared/theme.js. */
+
+@font-face { font-family: "Geist"; font-weight: 300; font-display: swap; src: url("../../fonts/Geist-Light.woff2") format("woff2"); }
+@font-face { font-family: "Geist"; font-weight: 400; font-display: swap; src: url("../../fonts/Geist-Regular.woff2") format("woff2"); }
+@font-face { font-family: "Geist"; font-weight: 500; font-display: swap; src: url("../../fonts/Geist-Medium.woff2") format("woff2"); }
+@font-face { font-family: "Geist Mono"; font-weight: 400; font-display: swap; src: url("../../fonts/GeistMono-Regular.woff2") format("woff2"); }
+@font-face { font-family: "Geist Mono"; font-weight: 500; font-display: swap; src: url("../../fonts/GeistMono-Medium.woff2") format("woff2"); }
+
+:root {
+  --bg: #151515;
+  --bg-raised: #1b1b1b;
+  --line: #2b2b2b;
+  --line-soft: #202020;
+  --text: #f3f3f0;
+  --muted: #8f8f8a;
+  --dim: #5e5e5a;
+  --accent: #3dffc5;
+  --accent-ink: #151515;
+  --accent-soft: rgba(61, 255, 197, 0.08);
+  --warn: #f6b54b;
+
+  --sans: "Geist", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --grid: 72px;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { background: var(--bg); }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+  background-size: var(--grid) var(--grid);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono { font-family: var(--mono); font-feature-settings: "zero" 1; }
+::selection { background: var(--accent); color: var(--accent-ink); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.page { max-width: 640px; margin: 0 auto; padding: 32px 20px 64px; }
+
+.logo { display: inline-flex; align-items: center; gap: 10px; font-size: 19px; letter-spacing: -0.03em; }
+.logo__mark { color: var(--muted); }
+
+.page-title {
+  margin: 24px 0 20px;
+  font-weight: 300;
+  font-size: 32px;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+}
+
+.panel {
+  margin-bottom: 20px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  background: rgba(21, 21, 21, 0.85);
+}
+
+.panel-title {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.note { margin: 0 0 16px; color: var(--muted); font-size: 13px; }
+
+/* ── Toggle ── */
+.toggle-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  cursor: pointer; user-select: none;
+}
+.toggle-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.toggle-title { font-size: 14px; }
+.toggle-sub { color: var(--muted); font-family: var(--mono); font-size: 11px; letter-spacing: 0.02em; }
+
+.switch-input { position: absolute; opacity: 0; pointer-events: none; }
+.switch {
+  position: relative; flex-shrink: 0; width: 36px; height: 20px;
+  border: 1px solid var(--line); background: var(--bg);
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+.switch::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px;
+  background: var(--muted); transition: transform 140ms ease, background-color 140ms ease;
+}
+.toggle-row:hover .switch { border-color: var(--muted); }
+.switch-input:checked + .switch { border-color: var(--accent); background: var(--accent-soft); }
+.switch-input:checked + .switch::after { transform: translateX(16px); background: var(--accent); }
+.switch-input:focus-visible + .switch { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* ── API key fields ── */
+.key-field + .key-field { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line-soft); }
+
+.key-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.key-label { font-size: 15px; }
+.key-status { margin-left: auto; color: var(--muted); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+.key-status.ok { color: var(--accent); }
+.key-status.warn { color: var(--warn); }
+
+.tag {
+  display: inline-block; padding: 1px 6px; border: 1px solid var(--line); color: var(--muted);
+  font-size: 10px; letter-spacing: 0.06em; line-height: 1.5; text-transform: uppercase;
+}
+.tag-required { border-color: var(--warn); color: var(--warn); }
+
+.key-controls { display: flex; gap: 8px; }
+.key-input {
+  flex: 1; min-width: 0; height: 36px; padding: 0 12px;
+  border: 1px solid var(--line); border-radius: 0; background: var(--bg); color: var(--text);
+  font-size: 13px;
+}
+.key-input::placeholder { color: var(--dim); }
+.key-input:hover { border-color: var(--muted); }
+.key-input:focus { outline: none; border-color: var(--accent); }
+
+.btn {
+  height: 36px; padding: 0 14px; border: 1px solid var(--line); border-radius: 0;
+  background: var(--bg); color: var(--text); cursor: pointer;
+  font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
+  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+.btn:hover { border-color: var(--muted); }
+.btn-save { border-color: var(--accent); color: var(--accent); }
+.btn-save:hover { background: var(--accent-soft); border-color: var(--accent); }
+.btn-remove:hover { border-color: var(--warn); color: var(--warn); }
+.btn[hidden] { display: none; }
+
+.key-help { margin: 8px 0 0; color: var(--muted); font-size: 12.5px; }
+.key-help a { color: var(--accent); text-decoration: none; white-space: nowrap; }
+.key-help a:hover { color: var(--text); }

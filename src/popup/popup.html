@@ -33,14 +33,17 @@
       <div class="empty-state">Loading…</div>
     </div>
 
-    <label class="popup-footer" for="auto-close-toggle">
-      <span class="footer-text">
-        <span class="footer-title">Auto-close result card</span>
-        <span class="footer-sub">Hide it after 10s (Esc still works)</span>
-      </span>
-      <input type="checkbox" id="auto-close-toggle" class="switch-input" />
-      <span class="switch" aria-hidden="true"></span>
-    </label>
+    <div class="popup-footer">
+      <span class="footer-hint mono" id="key-hint" hidden>AbuseIPDB key missing</span>
+      <button type="button" class="settings-btn" id="open-settings">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 7h10M18 7h2M4 17h2M10 17h10" stroke="currentColor" stroke-width="1.75"/>
+          <rect x="14" y="4" width="4" height="6" stroke="currentColor" stroke-width="1.75"/>
+          <rect x="6" y="14" width="4" height="6" stroke="currentColor" stroke-width="1.75"/>
+        </svg>
+        <span aria-hidden="true">[</span><span class="settings-btn__label">Settings</span><span aria-hidden="true">]</span>
+      </button>
+    </div>
   </div>
   <script src="popup.js"></script>
 </body>

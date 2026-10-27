@@ -153,12 +153,7 @@ function renderPopup(data, theme, options = {}) {
     }
     ${ID} .ioc-tag.warn { border-color: ${c.warn}; color: ${c.warn}; }
 
-    /* Sections and rows */
-    ${ID} .ioc-section-title {
-      margin: 16px 0 4px; color: ${c.muted};
-      font-family: ${mono}; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
-    }
-    ${ID} .ioc-section-title:first-of-type { margin-top: 0; }
+    /* Rows */
     ${ID} .ioc-row {
       display: grid; grid-template-columns: minmax(96px, 38%) 1fr; gap: 14px; align-items: baseline;
       padding: 6px 0; font-size: 13.5px;
@@ -173,11 +168,15 @@ function renderPopup(data, theme, options = {}) {
     ${ID} .ioc-row.is-highlight .ioc-value { color: ${c.accent}; }
 
     /* Status badge: square dot + text */
-    ${ID} .ioc-badge { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; }
+    ${ID} .ioc-badge { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; white-space: nowrap; }
     ${ID} .ioc-badge::before { content: ""; width: 8px; height: 8px; background: ${c.dim}; }
     ${ID} .ioc-badge.ok::before { background: ${c.accent}; }
     ${ID} .ioc-badge.bad { color: ${c.warn}; }
     ${ID} .ioc-badge.bad::before { background: ${c.warn}; }
+    ${ID} .ioc-badge.warn { color: ${c.warn}; }
+    ${ID} .ioc-badge.warn::before { background: ${c.warn}; }
+    ${ID} .ioc-badge.danger { color: ${c.danger}; }
+    ${ID} .ioc-badge.danger::before { background: ${c.danger}; }
     ${ID} .ioc-badge.na { color: ${c.muted}; }
 
     /* Bracketed mono links: the Argus signature */
@@ -215,6 +214,7 @@ function renderPopup(data, theme, options = {}) {
       flex: 1; min-width: 0; color: ${c.muted}; font-size: 12px;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
+    ${ID} .ioc-acc.is-open .ioc-acc-meta { visibility: hidden; }
     ${ID} .ioc-acc-body { display: none; padding: 4px 12px 12px; border-top: 1px solid ${c.lineSoft}; }
     ${ID} .ioc-acc.is-open .ioc-acc-body { display: block; }
 
@@ -411,6 +411,21 @@ function renderPopup(data, theme, options = {}) {
       <div class="ioc-head"><div class="ioc-eyebrow">IOC Recon</div></div>
       <div class="ioc-error">${esc(data.error)}</div>
     `;
+    if (data.needsSettings) {
+      const actions = document.createElement("div");
+      actions.className = "ioc-actions";
+      const openBtn = document.createElement("button");
+      openBtn.type = "button";
+      openBtn.className = "ioc-bracket";
+      openBtn.innerHTML = `<span aria-hidden="true">[</span><span class="ioc-bracket__label">Open settings</span><span aria-hidden="true">]</span>`;
+      openBtn.onclick = () => {
+        try {
+          chrome.runtime.sendMessage({ type: "open-options" });
+        } catch (_) {}
+      };
+      actions.appendChild(openBtn);
+      box.appendChild(actions);
+    }
     finish();
     return;
   }
@@ -434,12 +449,29 @@ function renderPopup(data, theme, options = {}) {
   const row = (label, value, highlight = false) =>
     `<div class="ioc-row${highlight && value != null ? " is-highlight" : ""}"><span class="ioc-label">${label}</span><span class="ioc-value">${value == null ? "N/D" : esc(value)}</span></div>`;
 
-  const connectionRow = (conn) =>
-    conn
-      ? `<div class="ioc-row"><span class="ioc-label">Connection type</span><span class="ioc-value" title="${esc(conn.basis)}">${esc(conn.type)} <small>(${esc(conn.confidence)})</small></span></div>`
-      : row("Connection type", null);
+  // AbuseIPDB confidence of abuse: 0 clean, 1-49 suspicious, 50+ likely abusive
+  const scoreRow = (d) => {
+    if (d.score == null) return row("Score", null);
+    const cls = d.score >= 50 ? "danger" : d.score > 0 ? "warn" : "ok";
+    const reports =
+      d.totalReports != null ? ` <small>(${esc(d.totalReports)} report${d.totalReports === 1 ? "" : "s"})</small>` : "";
+    return `<div class="ioc-row"><span class="ioc-label">Score</span><span class="ioc-value"><span class="ioc-badge ${cls} ioc-mono">${esc(d.score)}%</span>${reports}</span></div>`;
+  };
 
-  const sectionTitle = (label) => `<div class="ioc-section-title">${label}</div>`;
+  const flagRow = (label, flag) => {
+    const f = flag || { state: null, detail: null };
+    return `<div class="ioc-row"><span class="ioc-label">${label}</span><span class="ioc-value">${badge(f.state, "No", "Yes")}${f.detail ? ` <small>(${esc(f.detail)})</small>` : ""}</span></div>`;
+  };
+
+  const warningsHtml = (d) =>
+    (d.warnings || []).map((w) => `<div class="ioc-warning">${esc(w)}</div>`).join("");
+
+  const flagTags = (d) =>
+    [
+      d.isTor === true ? `<span class="ioc-tag warn">Tor</span>` : "",
+      d.proxy?.state === true ? `<span class="ioc-tag warn">Proxy</span>` : "",
+      d.vpn?.state === true ? `<span class="ioc-tag warn">VPN</span>` : ""
+    ].join("");
 
   const titleClass = (text, limit) => (String(text).length > limit ? "ioc-title is-long" : "ioc-title");
 
@@ -498,26 +530,18 @@ function renderPopup(data, theme, options = {}) {
   // IP (shared by the single-IP card and the multi-IP accordion)
   // ---------------------------------------------------------------------
   const ipRowsHtml = (d) => `
-      ${sectionTitle("Network")}
-      ${row("CIDR", d.cidr || (d.range ? null : "N/D"))}
-      ${d.range && !d.cidr ? row("Range", d.range) : ""}
-      ${row("Network name", d.name)}
-      ${d.org ? row("Organization", d.org) : ""}
-      ${row("ASN", d.asn, true)}
+      ${scoreRow(d)}
       ${row("ISP", d.isp)}
-      ${connectionRow(d.connection)}
-      ${d.ptr ? row("Reverse DNS", d.ptr) : ""}
-      ${row("Location", d.geo?.label, true)}
-      <div class="ioc-row"><span class="ioc-label">Tor Exit Node</span><span class="ioc-value">${badge(d.isTor, "False", "True")}</span></div>
+      ${row("Usage type", d.usageType)}
+      ${row("Country", d.country)}
+      ${row("City", d.city)}
+      ${flagRow("Proxy", d.proxy)}
+      ${flagRow("VPN", d.vpn)}
+      ${warningsHtml(d)}
     `;
 
   const makeIpActions = (d) => {
     const el = newActionRow();
-    const abuseipdbUrl =
-      d.abuseipdbUrl || `https://www.abuseipdb.com/check/${encodeURIComponent(d.ip)}`;
-    const spurUrl = d.spurUrl || `https://spur.us/context/${encodeURIComponent(d.ip)}`;
-    el.appendChild(makeLinkButton("AbuseIPDB ↗", abuseipdbUrl));
-    el.appendChild(makeLinkButton("Spur ↗", spurUrl));
     el.appendChild(makeCopyButton("Copy defanged", defangIp(d.ip)));
     return el;
   };
@@ -525,7 +549,7 @@ function renderPopup(data, theme, options = {}) {
   if (data.kind === "ip") {
     box.innerHTML = `
       <div class="ioc-head">
-        <div class="ioc-eyebrow"><span>IP address</span>${cachedTag}</div>
+        <div class="ioc-eyebrow"><span>IP address</span>${cachedTag}${flagTags(data)}</div>
         <div class="${titleClass(data.ip, 20)}">${esc(data.ip)}</div>
       </div>
       ${ipRowsHtml(data)}
@@ -568,8 +592,8 @@ function renderPopup(data, theme, options = {}) {
       const head = document.createElement("div");
       head.className = "ioc-acc-head";
 
-      const meta = [d.geo?.countryCode, d.asn, d.isp].filter(Boolean).join(" · ");
-      const torTag = d.isTor === true ? `<span class="ioc-tag warn">Tor</span>` : "";
+      const meta = [d.countryCode, d.score != null ? `${d.score}%` : null, d.isp].filter(Boolean).join(" · ");
+      const torTag = flagTags(d);
       const cacheTag = d.cached ? `<span class="ioc-tag">cache</span>` : "";
       head.innerHTML = `
         <svg class="ioc-acc-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.75"/></svg>
@@ -618,28 +642,14 @@ function renderPopup(data, theme, options = {}) {
   // URL / DOMAIN
   // ---------------------------------------------------------------------
   if (data.kind === "url") {
-    const torBadge = badge(data.isTor, "False", "True");
-
     box.innerHTML = `
       <div class="ioc-head">
-        <div class="ioc-eyebrow"><span>URL / Domain</span>${cachedTag}</div>
+        <div class="ioc-eyebrow"><span>URL / Domain</span>${cachedTag}${flagTags(data)}</div>
         <div class="${titleClass(data.domain, 22)}">${esc(data.domain)}</div>
         <div class="ioc-sub">${esc(data.url)}</div>
       </div>
-
-      ${sectionTitle("WHOIS")}
-      ${row("Registrar", data.rdap?.registrar, true)}
-      ${row("Registered", data.rdap?.registration ? new Date(data.rdap.registration).toLocaleDateString() : null)}
-      ${row("Expires", data.rdap?.expiration ? new Date(data.rdap.expiration).toLocaleDateString() : null)}
-
-      ${sectionTitle("Infrastructure")}
       ${row("Resolved IP", data.ips && data.ips.length ? data.ips.join(", ") : null, true)}
-      ${row("Location", data.geo?.label)}
-      ${data.geo?.org ? row("Organization", data.geo.org) : ""}
-      ${row("ISP", data.isp)}
-      ${connectionRow(data.connection)}
-      ${data.ptr ? row("Reverse DNS", data.ptr) : ""}
-      <div class="ioc-row"><span class="ioc-label">Tor Exit Node</span><span class="ioc-value">${torBadge}</span></div>
+      ${data.resolvedIp ? ipRowsHtml(data) : warningsHtml(data)}
     `;
 
     actionRow.appendChild(makeLinkButton("VirusTotal ↗", virustotalUrl));

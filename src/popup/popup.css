@@ -44,6 +44,7 @@
   --accent-hover: #73ffd5;
   --accent-ink: #151515;
   --accent-soft: rgba(61, 255, 197, 0.08);
+  --warn: #f6b54b;
 
   --sans: "Geist", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -241,80 +242,52 @@ body {
   color: var(--accent-ink);
 }
 
-/* ── Footer: auto-close toggle ──────────────────────── */
+/* ── Footer: settings button ────────────────────────── */
 
 .popup-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 16px;
+  min-height: 46px;
+  padding: 8px 16px;
   border-top: 1px solid var(--line-soft);
   flex-shrink: 0;
-  cursor: pointer;
-  user-select: none;
 }
 
-.footer-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.footer-title {
-  font-size: 14px;
-}
-
-.footer-sub {
-  color: var(--muted);
-  font-family: var(--mono);
+.footer-hint {
+  color: var(--warn);
   font-size: 11px;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-.switch-input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
+.footer-hint[hidden] {
+  display: none;
 }
 
-.switch {
-  position: relative;
-  flex-shrink: 0;
-  width: 36px;
-  height: 20px;
-  border: 1px solid var(--line);
-  background: var(--bg);
-  transition: border-color 140ms ease, background-color 140ms ease;
+/* Bracketed mono link, the Argus signature */
+.settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+  margin-left: auto;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-.switch::after {
-  content: "";
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 12px;
-  height: 12px;
-  background: var(--muted);
-  transition: transform 140ms ease, background-color 140ms ease;
+.settings-btn__label {
+  margin: 0 -0.15em;
+  transition: color 120ms ease;
 }
 
-.popup-footer:hover .switch {
-  border-color: var(--muted);
-}
-
-.switch-input:checked + .switch {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-
-.switch-input:checked + .switch::after {
-  transform: translateX(16px);
-  background: var(--accent);
-}
-
-.switch-input:focus-visible + .switch {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
+.settings-btn:hover .settings-btn__label {
+  color: var(--text);
 }

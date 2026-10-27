@@ -1,9 +1,10 @@
-const CACHE_TTL_RESULT_MS = 30 * 60 * 1000;
-const CACHE_TTL_TORLIST_MS = 60 * 60 * 1000;
+// Threat intel lookups: AbuseIPDB (reputation + ISP/usage/country) and
+// Proxycheck.io (proxy / VPN flags + city). Google DNS-over-HTTPS is only used to
+// resolve a domain to the IP that is then analyzed.
 
-function abuseIpDbUrl(ip) {
-  return `https://www.abuseipdb.com/check/${encodeURIComponent(ip)}`;
-}
+const CACHE_TTL_RESULT_MS = 30 * 60 * 1000;
+const FETCH_TIMEOUT_MS = 10000;
+const ABUSEIPDB_MAX_AGE_DAYS = 90;
 
 function toBase64Url(str) {
   const b64 = btoa(unescape(encodeURIComponent(str)));
@@ -11,297 +12,185 @@ function toBase64Url(str) {
 }
 
 function virusTotalUrlLink(url) {
-  const id = toBase64Url(url);
-  return `https://www.virustotal.com/gui/url/${id}`;
+  return `https://www.virustotal.com/gui/url/${toBase64Url(url)}`;
 }
 
 function whoisUrl(domain) {
   return `https://whois.domaintools.com/${encodeURIComponent(domain)}`;
 }
 
-function spurContextUrl(ip) {
-  return `https://spur.us/context/${encodeURIComponent(ip)}`;
+async function loadApiKeys() {
+  const [abuseipdb, proxycheck] = await Promise.all([
+    SecureStore.getSecret("abuseipdb"),
+    SecureStore.getSecret("proxycheck")
+  ]);
+  return { abuseipdb, proxycheck };
 }
 
-// --- Tor Exit List ---
-// Shared in-flight download: parallel lookups (multi-IP) must not each fetch the list
-let torListInflight = null;
+async function fetchJson(url, init = {}) {
+  const res = await fetch(url, { ...init, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+  let body = null;
+  try {
+    body = await res.json();
+  } catch (_) {}
+  return { res, body };
+}
 
-async function loadTorList() {
-  const cached = await cacheGet("tor:list");
-  if (cached) return cached;
+const str = (v) => (typeof v === "string" && v.trim() ? v.trim() : null);
 
-  if (!torListInflight) {
-    torListInflight = (async () => {
-      const res = await fetch("https://check.torproject.org/torbulkexitlist");
-      if (!res.ok) throw new Error(`Tor exit list HTTP ${res.status}`);
-      const text = await res.text();
-      const list = text.split("\n").map((l) => l.trim());
-      await cacheSet("tor:list", list, CACHE_TTL_TORLIST_MS);
-      return list;
-    })().finally(() => {
-      torListInflight = null;
-    });
+function countryName(code) {
+  if (!code) return null;
+  try {
+    return new Intl.DisplayNames(["en"], { type: "region" }).of(code.toUpperCase()) || null;
+  } catch (_) {
+    return null;
   }
-  return torListInflight;
 }
 
-async function isTorExitNode(ip) {
-  const list = await loadTorList();
-  return list.includes(ip.trim());
-}
+// --- AbuseIPDB: https://docs.abuseipdb.com/#check-endpoint ---
+async function lookupAbuseIpDb(ip, key) {
+  const url =
+    `https://api.abuseipdb.com/api/v2/check?ipAddress=${encodeURIComponent(ip)}` +
+    `&maxAgeInDays=${ABUSEIPDB_MAX_AGE_DAYS}`;
+  const { res, body } = await fetchJson(url, {
+    headers: { Key: key, Accept: "application/json" }
+  });
 
-// --- GeoJS ---
-async function lookupGeo(ip) {
-  const url = `https://get.geojs.io/v1/ip/geo/${encodeURIComponent(ip)}.json`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`GeoJS HTTP ${res.status}`);
-  const data = await res.json();
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      throw new Error("AbuseIPDB rejected the API key. Check it in Settings.");
+    }
+    if (res.status === 429) {
+      throw new Error("AbuseIPDB daily request limit reached.");
+    }
+    const detail = body?.errors?.[0]?.detail;
+    throw new Error(`AbuseIPDB: ${detail || `HTTP ${res.status}`}`);
+  }
 
-  const parts = [data.city, data.region, data.country].filter(
-    (p) => p && p !== "-" && p !== ""
-  );
-  const label = parts.length ? parts.join(", ") : "N/D";
+  const d = body?.data;
+  if (!d) throw new Error("AbuseIPDB: unexpected response");
 
   return {
-    label,
-    countryCode: data.country_code || null,
-    lat: data.latitude || null,
-    lon: data.longitude || null,
-    org: data.organization_name || data.organization || null
+    score: Number.isFinite(d.abuseConfidenceScore) ? d.abuseConfidenceScore : null,
+    totalReports: Number.isFinite(d.totalReports) ? d.totalReports : null,
+    isp: str(d.isp),
+    usageType: str(d.usageType),
+    countryCode: str(d.countryCode),
+    isTor: d.isTor === true
   };
 }
 
-// --- ASN ---
-async function lookupAsn(ip) {
-  const url = `https://ipinfo.io/${encodeURIComponent(ip)}/json`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`ipinfo HTTP ${res.status}`);
-  const data = await res.json();
+// --- Proxycheck.io v3: https://proxycheck.io/api/ ---
+// Works without a key (100 queries/day); a free key raises it to 1,000/day.
+async function lookupProxycheck(ip, key) {
+  if (!/^[0-9a-fA-F:.]+$/.test(ip)) throw new Error("Proxycheck: invalid IP");
+  const url = `https://proxycheck.io/v3/${ip}${key ? `?key=${encodeURIComponent(key)}` : ""}`;
+  const { res, body } = await fetchJson(url);
 
-  // data.org è tipicamente nella forma "AS15169 Google LLC"
-  const org = data.org || "";
-  const match = org.match(/^(AS\d+)/i);
+  if (!body || typeof body !== "object") throw new Error(`Proxycheck: HTTP ${res.status}`);
+  if (body.status === "denied" || body.status === "error" || !res.ok) {
+    throw new Error(`Proxycheck: ${str(body.message) || `HTTP ${res.status}`}`);
+  }
+
+  const entry =
+    body[ip] ||
+    body[ip.toLowerCase()] ||
+    Object.values(body).find((v) => v && typeof v === "object" && (v.detections || v.location));
+  if (!entry) throw new Error("Proxycheck: no result for this IP");
+
+  const det = entry.detections || {};
+  const loc = entry.location || {};
+  const op = entry.operator && typeof entry.operator === "object" ? entry.operator : null;
+
+  const opName = str(op?.name);
+  const protocols = Array.isArray(op?.protocols)
+    ? op.protocols.filter((p) => typeof p === "string").join(", ") || null
+    : null;
+
+  const flag = (value, detail) => ({
+    state: typeof value === "boolean" ? value : null,
+    detail: value === true ? detail : null
+  });
 
   return {
-    asn: match ? match[1].toUpperCase() : null
+    // v3 does not expose a dedicated proxy/VPN "type": the operator (e.g. a VPN
+    // provider) and its protocols are the closest thing, shown when available.
+    // (when the IP is also a VPN, the operator/protocols describe the VPN, not the proxy)
+    proxy: flag(det.proxy, det.vpn === true ? null : protocols || opName),
+    vpn: flag(det.vpn, opName && protocols ? `${opName} · ${protocols}` : opName || protocols),
+    isTor: det.tor === true,
+    risk: Number.isFinite(det.risk) ? det.risk : null,
+    city: str(loc.city_name) || str(loc.city),
+    country: str(loc.country_name) || str(loc.country),
+    countryCode: str(loc.country_code) || str(loc.isocode)
   };
 }
 
-async function lookupRdapIp(ip) {
-  const url = `https://rdap.org/ip/${encodeURIComponent(ip)}`;
-  const res = await fetch(url, { headers: { Accept: "application/rdap+json" } });
-  if (!res.ok) throw new Error(`RDAP HTTP ${res.status}`);
-  const data = await res.json();
-
-  let cidr = null;
-  if (Array.isArray(data.cidr0_cidrs) && data.cidr0_cidrs.length > 0) {
-    const c = data.cidr0_cidrs[0];
-    if (c.v4prefix) cidr = `${c.v4prefix}/${c.length}`;
-    else if (c.v6prefix) cidr = `${c.v6prefix}/${c.length}`;
-  }
-  const range =
-    data.startAddress && data.endAddress
-      ? `${data.startAddress} - ${data.endAddress}`
-      : null;
-
-  const name = data.name || data.handle || "N/D";
-  const org =
-    (data.entities &&
-      data.entities
-        .map((e) => e.vcardArray?.[1]?.find((f) => f[0] === "fn")?.[3])
-        .filter(Boolean)[0]) ||
-    null;
-
-  return { cidr, range, name, org };
-}
-
-// --- RDAP: WHOIS ---
-async function lookupRdapDomain(domain) {
-  const url = `https://rdap.org/domain/${encodeURIComponent(domain)}`;
-  const res = await fetch(url, { headers: { Accept: "application/rdap+json" } });
-  if (!res.ok) throw new Error(`RDAP HTTP ${res.status}`);
-  const data = await res.json();
-
-  const registrar =
-    (data.entities &&
-      data.entities
-        .filter((e) => (e.roles || []).includes("registrar"))
-        .map((e) => e.vcardArray?.[1]?.find((f) => f[0] === "fn")?.[3])
-        .filter(Boolean)[0]) || null;
-
-  const events = data.events || [];
-  const registration = events.find((e) => e.eventAction === "registration")?.eventDate || null;
-  const expiration = events.find((e) => e.eventAction === "expiration")?.eventDate || null;
-
-  const nameservers = (data.nameservers || []).map((ns) => ns.ldhName).filter(Boolean);
-
-  return { registrar, registration, expiration, nameservers };
-}
-
+// --- Domain -> IP (Google DNS-over-HTTPS) ---
 async function resolveDns(domain) {
   const url = `https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=A`;
-  const res = await fetch(url);
+  const { res, body } = await fetchJson(url);
   if (!res.ok) throw new Error(`DNS HTTP ${res.status}`);
-  const data = await res.json();
-  return (data.Answer || []).filter((a) => a.type === 1).map((a) => a.data);
+  return (body?.Answer || []).filter((a) => a.type === 1).map((a) => a.data);
 }
 
+// Merges AbuseIPDB (everything except proxy/VPN) and Proxycheck (proxy/VPN, and city,
+// which AbuseIPDB does not provide) into the fields shown by the card.
+async function gatherIpIntel(ip, keys) {
+  const [abuse, pc] = await Promise.allSettled([
+    lookupAbuseIpDb(ip, keys.abuseipdb),
+    lookupProxycheck(ip, keys.proxycheck)
+  ]);
 
-// --- Reverse DNS (PTR) via Google DoH ---
-function ptrName(ip) {
-  if (ip.includes(":")) {
-    const [head, tail] = ip.split("::");
-    const h = head ? head.split(":") : [];
-    const t = ip.includes("::") && tail ? tail.split(":") : [];
-    const fill = ip.includes("::") ? 8 - h.length - t.length : 0;
-    const groups = [...h, ...Array(Math.max(fill, 0)).fill("0"), ...t].map((g) =>
-      g.padStart(4, "0")
-    );
-    if (groups.length !== 8) return null;
-    return groups.join("").split("").reverse().join(".") + ".ip6.arpa";
-  }
-  return ip.split(".").reverse().join(".") + ".in-addr.arpa";
-}
+  const warnings = [];
+  const a = abuse.status === "fulfilled" ? abuse.value : null;
+  const p = pc.status === "fulfilled" ? pc.value : null;
+  if (!a) warnings.push(abuse.reason?.message || "AbuseIPDB lookup failed");
+  if (!p) warnings.push(pc.reason?.message || "Proxycheck lookup failed");
 
-async function lookupPtr(ip) {
-  const name = ptrName(ip.trim());
-  if (!name) return null;
-  const url = `https://dns.google/resolve?name=${encodeURIComponent(name)}&type=PTR`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`PTR HTTP ${res.status}`);
-  const data = await res.json();
-  const answer = (data.Answer || []).find((a) => a.type === 12);
-  return answer ? answer.data.replace(/\.$/, "").toLowerCase() : null;
-}
-
-// --- ipapi.is: ISP / ASN type / mobile-datacenter-proxy flags (no API key) ---
-async function lookupIpapiIs(ip) {
-  const url = `https://api.ipapi.is/?q=${encodeURIComponent(ip)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`ipapi.is HTTP ${res.status}`);
-  const data = await res.json();
-  if (data.error) throw new Error(`ipapi.is: ${data.error}`);
+  const countryCode = a?.countryCode || p?.countryCode || null;
+  const country = countryName(a?.countryCode) || p?.country || null;
 
   return {
-    asnOrg: data.asn?.org || null,
-    companyName: data.company?.name || null,
-    asnType: (data.asn?.type || "").toLowerCase(),
-    companyType: (data.company?.type || "").toLowerCase(),
-    isMobile: data.is_mobile === true,
-    isDatacenter: data.is_datacenter === true,
-    isProxy: data.is_proxy === true,
-    isVpn: data.is_vpn === true,
-    isTor: data.is_tor === true
+    kind: "ip",
+    ip,
+    score: a?.score ?? null,
+    totalReports: a?.totalReports ?? null,
+    isp: a?.isp || null,
+    usageType: a?.usageType || null,
+    countryCode,
+    country: country ? (countryCode ? `${country} (${countryCode})` : country) : countryCode,
+    city: p?.city || null,
+    proxy: p?.proxy || { state: null, detail: null },
+    vpn: p?.vpn || { state: null, detail: null },
+    risk: p?.risk ?? null,
+    isTor: a?.isTor === true || p?.isTor === true,
+    warnings,
+    incomplete: !a || !p
   };
 }
 
-// --- ISP: the AS operator is the most reliable proxy for "who is the ISP" ---
-function pickIsp(ipapi, rdapOrg) {
-  return (
-    ipapi?.asnOrg || ipapi?.companyName || rdapOrg || null
-  );
-}
-
-// --- Connection type (heuristic: no database states "fixed line" with certainty) ---
-const PTR_MOBILE_RE = /(mobile|\blte\b|umts|gprs|hsdpa|cellular|gsm|cgnat|(^|[.-])[345]g([.-]|\d|$))/i;
-const PTR_HOSTING_RE = /(compute|amazonaws|cloud|vps|server|hosting|datacenter|colo|googleusercontent|azure)/i;
-const PTR_FIXED_RE = /(dsl|fttc|fttx|ftth|fiber|fibre|cable|docsis|broadband|dialup|dynamic|dyn-|pool|cust|resident|ppp|static)/i;
-
-function classifyConnection(ipapi, ptr) {
-  const mk = (type, confidence, basis) => ({ type, confidence, basis });
-  const ptrTxt = ptr || "";
-
-  if (ipapi) {
-    const types = [ipapi.asnType, ipapi.companyType];
-
-    if (ipapi.isMobile) return mk("Mobile", "high", "Flagged mobile by ipapi.is");
-    if (ipapi.isDatacenter || types.includes("hosting")) {
-      return mk("Hosting / Datacenter", "high", "Datacenter/hosting ASN (ipapi.is)");
-    }
-    if (ipapi.isVpn || ipapi.isProxy || ipapi.isTor) {
-      return mk("VPN / Proxy", "high", "Flagged VPN/proxy/Tor by ipapi.is");
-    }
-    if (PTR_MOBILE_RE.test(ptrTxt)) {
-      return mk("Mobile", "medium", `Mobile hint in reverse DNS (${ptrTxt})`);
-    }
-    if (types.includes("isp")) {
-      return PTR_FIXED_RE.test(ptrTxt)
-        ? mk("Fixed line", "high", `ISP ASN + fixed-line hint in reverse DNS (${ptrTxt})`)
-        : mk("Fixed line", "medium", "ISP ASN, not flagged mobile/hosting/proxy");
-    }
-    if (types.some((t) => ["business", "education", "government", "banking"].includes(t))) {
-      return mk("Business network", "medium", `ASN type: ${types.filter(Boolean).join("/")}`);
-    }
-  }
-
-  // fallback when ipapi.is is unavailable: reverse DNS only
-  if (ptrTxt) {
-    if (PTR_HOSTING_RE.test(ptrTxt)) return mk("Hosting / Datacenter", "low", `Reverse DNS: ${ptrTxt}`);
-    if (PTR_MOBILE_RE.test(ptrTxt)) return mk("Mobile", "low", `Reverse DNS: ${ptrTxt}`);
-    if (PTR_FIXED_RE.test(ptrTxt)) return mk("Fixed line", "low", `Reverse DNS: ${ptrTxt}`);
-  }
-  return mk("Unknown", "low", "Not enough data");
-}
-
-async function gatherIpIntel(ip) {
-  const result = { kind: "ip", ip };
-  result.abuseipdbUrl = abuseIpDbUrl(ip);
-  result.spurUrl = spurContextUrl(ip);
-
-  const [rdap, tor, geo, asn, ipapi, ptr] = await Promise.allSettled([
-    lookupRdapIp(ip),
-    isTorExitNode(ip),
-    lookupGeo(ip),
-    lookupAsn(ip),
-    lookupIpapiIs(ip),
-    lookupPtr(ip)
-  ]);
-
-  if (rdap.status === "fulfilled") Object.assign(result, rdap.value);
-  result.isTor = tor.status === "fulfilled" ? tor.value : null;
-  if (geo.status === "fulfilled") result.geo = geo.value;
-  if (asn.status === "fulfilled") Object.assign(result, asn.value);
-
-  const ipapiVal = ipapi.status === "fulfilled" ? ipapi.value : null;
-  result.ptr = ptr.status === "fulfilled" ? ptr.value : null;
-  result.isp = pickIsp(ipapiVal, result.org);
-  result.connection = classifyConnection(ipapiVal, result.ptr);
-
-  return result;
-}
-
-async function gatherUrlIntel(url, domain) {
+async function gatherUrlIntel(url, domain, keys) {
   const result = { kind: "url", url, domain };
   result.virustotalUrl = virusTotalUrlLink(url);
   result.whoisUrl = whoisUrl(domain);
 
-  const [rdap, ipsResult] = await Promise.allSettled([
-    lookupRdapDomain(domain),
-    resolveDns(domain)
-  ]);
+  let ips = [];
+  let dnsError = null;
+  try {
+    ips = await resolveDns(domain);
+  } catch (e) {
+    dnsError = e.message;
+  }
+  result.ips = ips;
 
-  if (rdap.status === "fulfilled") result.rdap = rdap.value;
-  result.ips = ipsResult.status === "fulfilled" ? ipsResult.value : [];
-
-  if (result.ips.length > 0) {
-    const firstIp = result.ips[0];
-    const [geo, tor, ipapi, ptr] = await Promise.allSettled([
-      lookupGeo(firstIp),
-      isTorExitNode(firstIp),
-      lookupIpapiIs(firstIp),
-      lookupPtr(firstIp)
-    ]);
-    if (geo.status === "fulfilled") result.geo = geo.value;
-    result.isTor = tor.status === "fulfilled" ? tor.value : null;
-
-    const ipapiVal = ipapi.status === "fulfilled" ? ipapi.value : null;
-    result.ptr = ptr.status === "fulfilled" ? ptr.value : null;
-    result.isp = pickIsp(ipapiVal, result.geo?.org);
-    result.connection = classifyConnection(ipapiVal, result.ptr);
-  } else {
-    result.isTor = null;
+  if (ips.length === 0) {
+    result.warnings = [dnsError ? `DNS lookup failed: ${dnsError}` : "The domain does not resolve to an IPv4 address."];
+    result.incomplete = true;
+    return result;
   }
 
-  return result;
+  // The first resolved IP is the one analyzed (the others are listed)
+  const { kind, ip, ...intel } = await gatherIpIntel(ips[0], keys);
+  return { ...result, ...intel, resolvedIp: ip };
 }

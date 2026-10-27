@@ -1,6 +1,7 @@
 importScripts(
   "../shared/theme.js",
   "./ioc-classifier.js",
+  "../shared/secure-store.js",
   "./storage.js",
   "./intel.js",
   "./inject-popup.js"
@@ -9,12 +10,25 @@ importScripts(
 const MENU_ID = "ioc-recon";
 const COMMAND_ID = "ioc-recon-selection";
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener(async () => {
   chrome.contextMenus.create({
     id: MENU_ID,
     title: 'IOC recon of "%s"',
     contexts: ["selection"]
   });
+  // Results cached by older versions use a different format: drop them
+  try {
+    const all = await chrome.storage.local.get(null);
+    const stale = Object.keys(all).filter((k) => /^v[12]:/.test(k) || k === "tor:list");
+    if (stale.length) await chrome.storage.local.remove(stale);
+  } catch (_) {}
+});
+
+// The injected result card asks us to open the settings page
+chrome.runtime.onMessage.addListener((msg, sender) => {
+  if (sender.id === chrome.runtime.id && msg?.type === "open-options") {
+    chrome.runtime.openOptionsPage();
+  }
 });
 
 // Minimum frame viewport in which the card is rendered inside a sub-frame.
@@ -51,7 +65,7 @@ async function showCard(tabId, data, ctx = {}) {
   }
 }
 
-// Max parallel IP lookups: each IP fires ~6 requests, so keep the burst small
+// Max parallel IP lookups: each IP fires 2 requests (AbuseIPDB + Proxycheck)
 const IP_LOOKUP_CONCURRENCY = 3;
 
 // Runs fn over items with at most `limit` in flight, preserving the order of results
@@ -68,24 +82,26 @@ async function mapWithConcurrency(items, limit, fn) {
   return results;
 }
 
-const ipCacheKey = (ip) => `v2:ip:${ip}`;
+const ipCacheKey = (ip) => `v3:ip:${ip}`;
 
-async function lookupIp(ip) {
+async function lookupIp(ip, keys) {
   const cached = await cacheGet(ipCacheKey(ip));
   if (cached) return { ...cached, cached: true };
 
   let result;
   try {
-    result = await gatherIpIntel(ip);
+    result = await gatherIpIntel(ip, keys);
   } catch (_) {
     // One failing IP must not take down the whole batch
-    return { kind: "ip", ip };
+    return { kind: "ip", ip, warnings: ["Lookup failed"], incomplete: true };
   }
-  await cacheSet(ipCacheKey(ip), result, CACHE_TTL_RESULT_MS);
+  // Partial results (a service failed or was rate limited) are not cached, so the
+  // next attempt asks again instead of repeating the gap for 30 minutes
+  if (!result.incomplete) await cacheSet(ipCacheKey(ip), result, CACHE_TTL_RESULT_MS);
   return result;
 }
 
-async function runIpRecon({ ips, total }, tabId, ctx) {
+async function runIpRecon({ ips, total }, keys, tabId, ctx) {
   // History: saved in reverse so the first IP of the selection ends up on top
   for (const ip of [...ips].reverse()) {
     await saveToHistory({
@@ -105,7 +121,7 @@ async function runIpRecon({ ips, total }, tabId, ctx) {
     }
   }
 
-  const results = await mapWithConcurrency(ips, IP_LOOKUP_CONCURRENCY, lookupIp);
+  const results = await mapWithConcurrency(ips, IP_LOOKUP_CONCURRENCY, (ip) => lookupIp(ip, keys));
 
   if (results.length === 1) {
     showCard(tabId, results[0], ctx);
@@ -123,8 +139,22 @@ async function runRecon(rawSelection, tabId, ctx = {}) {
     return;
   }
 
+  // AbuseIPDB needs an API key (Proxycheck works without one, with a lower daily quota)
+  const keys = await loadApiKeys();
+  if (!keys.abuseipdb) {
+    showCard(
+      tabId,
+      {
+        error: "AbuseIPDB API key not set. Add it in the extension settings to run lookups.",
+        needsSettings: true
+      },
+      ctx
+    );
+    return;
+  }
+
   if (classified.kind === "ips") {
-    await runIpRecon(classified, tabId, ctx);
+    await runIpRecon(classified, keys, tabId, ctx);
     return;
   }
 
@@ -137,7 +167,7 @@ async function runRecon(rawSelection, tabId, ctx = {}) {
     timestamp: Date.now()
   });
 
-  const cacheKey = `v2:domain:${classified.domain}`;
+  const cacheKey = `v3:domain:${classified.domain}`;
 
   const cachedResult = await cacheGet(cacheKey);
   if (cachedResult) {
@@ -145,9 +175,9 @@ async function runRecon(rawSelection, tabId, ctx = {}) {
     return;
   }
 
-  const result = await gatherUrlIntel(classified.url, classified.domain);
+  const result = await gatherUrlIntel(classified.url, classified.domain, keys);
 
-  await cacheSet(cacheKey, result, CACHE_TTL_RESULT_MS);
+  if (!result.incomplete) await cacheSet(cacheKey, result, CACHE_TTL_RESULT_MS);
 
   showCard(tabId, result, ctx);
 }
