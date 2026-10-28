@@ -50,9 +50,10 @@ The default shortcut is **Alt+R** (**Option+R** on macOS). You can change it at 
 | **Country** | AbuseIPDB |
 | **City** — AbuseIPDB does not provide it | Proxycheck.io |
 | **Proxy** yes/no, with the operator/protocols when known | Proxycheck.io |
+| **Tor** yes/no — whether the IP is a Tor exit node | Proxycheck.io |
 | **VPN** yes/no, with the VPN operator/protocols when known | Proxycheck.io |
 
-A **Tor** tag is shown when either service flags the IP as a Tor exit node. If one of the two services fails (rate limit, wrong key, network error) the card still shows what the other one returned, with a note explaining what is missing; incomplete results are never cached.
+A **Tor** tag is also shown next to the IP when Proxycheck flags it as a Tor exit node. If one of the two services fails (rate limit, wrong key, network error) the card still shows what the other one returned, with a note explaining what is missing; incomplete results are never cached.
 
 ### If you select a URL or domain
 

@@ -468,7 +468,7 @@ function renderPopup(data, theme, options = {}) {
 
   const flagTags = (d) =>
     [
-      d.isTor === true ? `<span class="ioc-tag warn">Tor</span>` : "",
+      d.tor?.state === true ? `<span class="ioc-tag warn">Tor</span>` : "",
       d.proxy?.state === true ? `<span class="ioc-tag warn">Proxy</span>` : "",
       d.vpn?.state === true ? `<span class="ioc-tag warn">VPN</span>` : ""
     ].join("");
@@ -536,6 +536,7 @@ function renderPopup(data, theme, options = {}) {
       ${row("Country", d.country)}
       ${row("City", d.city)}
       ${flagRow("Proxy", d.proxy)}
+      ${flagRow("Tor", d.tor)}
       ${flagRow("VPN", d.vpn)}
       ${warningsHtml(d)}
     `;

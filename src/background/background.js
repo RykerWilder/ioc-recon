@@ -19,7 +19,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   // Results cached by older versions use a different format: drop them
   try {
     const all = await chrome.storage.local.get(null);
-    const stale = Object.keys(all).filter((k) => /^v[12]:/.test(k) || k === "tor:list");
+    const stale = Object.keys(all).filter((k) => /^v[1-3]:/.test(k) || k === "tor:list");
     if (stale.length) await chrome.storage.local.remove(stale);
   } catch (_) {}
 });
@@ -82,7 +82,7 @@ async function mapWithConcurrency(items, limit, fn) {
   return results;
 }
 
-const ipCacheKey = (ip) => `v3:ip:${ip}`;
+const ipCacheKey = (ip) => `v4:ip:${ip}`;
 
 async function lookupIp(ip, keys) {
   const cached = await cacheGet(ipCacheKey(ip));
@@ -167,7 +167,7 @@ async function runRecon(rawSelection, tabId, ctx = {}) {
     timestamp: Date.now()
   });
 
-  const cacheKey = `v3:domain:${classified.domain}`;
+  const cacheKey = `v4:domain:${classified.domain}`;
 
   const cachedResult = await cacheGet(cacheKey);
   if (cachedResult) {

@@ -75,8 +75,7 @@ async function lookupAbuseIpDb(ip, key) {
     totalReports: Number.isFinite(d.totalReports) ? d.totalReports : null,
     isp: str(d.isp),
     usageType: str(d.usageType),
-    countryCode: str(d.countryCode),
-    isTor: d.isTor === true
+    countryCode: str(d.countryCode)
   };
 }
 
@@ -118,7 +117,8 @@ async function lookupProxycheck(ip, key) {
     // (when the IP is also a VPN, the operator/protocols describe the VPN, not the proxy)
     proxy: flag(det.proxy, det.vpn === true ? null : protocols || opName),
     vpn: flag(det.vpn, opName && protocols ? `${opName} · ${protocols}` : opName || protocols),
-    isTor: det.tor === true,
+    // Tor exit node flag (detections.tor is always present in v3 results)
+    tor: flag(det.tor, null),
     risk: Number.isFinite(det.risk) ? det.risk : null,
     city: str(loc.city_name) || str(loc.city),
     country: str(loc.country_name) || str(loc.country),
@@ -162,9 +162,9 @@ async function gatherIpIntel(ip, keys) {
     country: country ? (countryCode ? `${country} (${countryCode})` : country) : countryCode,
     city: p?.city || null,
     proxy: p?.proxy || { state: null, detail: null },
+    tor: p?.tor || { state: null, detail: null },
     vpn: p?.vpn || { state: null, detail: null },
     risk: p?.risk ?? null,
-    isTor: a?.isTor === true || p?.isTor === true,
     warnings,
     incomplete: !a || !p
   };
